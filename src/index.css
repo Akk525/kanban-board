@@ -13,22 +13,128 @@
 
 @layer components {
   .card {
-    @apply bg-white rounded-lg shadow-sm border border-gray-200 p-4 hover:shadow-md transition-shadow cursor-pointer;
+    @apply bg-white rounded-lg shadow-sm border border-gray-200 p-4 cursor-pointer;
+    transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  }
+  
+  .card:hover {
+    @apply shadow-lg;
+    transform: translateY(-2px);
   }
   
   .column {
     @apply bg-gray-50 rounded-lg p-4 min-h-[600px] w-80;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  }
+  
+  .column:hover {
+    @apply bg-gray-100;
   }
   
   .btn-primary {
-    @apply bg-primary-600 hover:bg-primary-700 text-white font-medium py-2 px-4 rounded-lg transition-colors;
+    @apply bg-blue-600 hover:bg-blue-700 text-white font-medium py-2 px-4 rounded-lg;
+    transition: all 0.2s ease;
+  }
+  
+  .btn-primary:hover {
+    transform: translateY(-1px);
+    @apply shadow-md;
+  }
+  
+  .btn-primary:active {
+    transform: translateY(0);
   }
   
   .btn-secondary {
-    @apply bg-gray-200 hover:bg-gray-300 text-gray-800 font-medium py-2 px-4 rounded-lg transition-colors;
+    @apply bg-gray-200 hover:bg-gray-300 text-gray-800 font-medium py-2 px-4 rounded-lg;
+    transition: all 0.2s ease;
+  }
+  
+  .btn-secondary:hover {
+    transform: translateY(-1px);
+    @apply shadow-sm;
+  }
+  
+  .btn-secondary:active {
+    transform: translateY(0);
+  }
+  
+  .btn-danger {
+    @apply bg-red-600 hover:bg-red-700 text-white font-medium py-2 px-4 rounded-lg;
+    transition: all 0.2s ease;
+  }
+  
+  .btn-danger:hover {
+    transform: translateY(-1px);
+    @apply shadow-md;
   }
   
   .dropdown {
     @apply absolute right-0 mt-2 w-48 bg-white rounded-md shadow-lg border border-gray-200 z-10;
+    animation: slideDown 0.2s ease-out;
+  }
+  
+  @keyframes slideDown {
+    from {
+      opacity: 0;
+      transform: translateY(-10px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+  
+  @keyframes fadeIn {
+    from {
+      opacity: 0;
+    }
+    to {
+      opacity: 1;
+    }
+  }
+  
+  @keyframes slideUp {
+    from {
+      opacity: 0;
+      transform: translateY(20px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+  
+  @keyframes scaleIn {
+    from {
+      opacity: 0;
+      transform: scale(0.95);
+    }
+    to {
+      opacity: 1;
+      transform: scale(1);
+    }
+  }
+  
+  .modal-backdrop {
+    animation: fadeIn 0.2s ease-out;
+  }
+  
+  .modal-content {
+    animation: scaleIn 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  }
+  
+  .card-enter {
+    animation: slideUp 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  }
+  
+  .delete-confirm {
+    animation: shake 0.3s ease;
+  }
+  
+  @keyframes shake {
+    0%, 100% { transform: translateX(0); }
+    25% { transform: translateX(-5px); }
+    75% { transform: translateX(5px); }
   }
 }

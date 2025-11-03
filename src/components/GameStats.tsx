@@ -31,37 +31,52 @@ export const GameStats: React.FC = () => {
           </button>
         </div>
 
-        <div className="grid grid-cols-4 gap-3 mb-3"> {/* Always 4 columns, reduced gaps and margins */}
+        <div className="grid grid-cols-4 gap-3 mb-3">
           <div className="text-center">
-            <div className="text-xl font-bold text-blue-600">{state.level}</div> {/* Smaller text */}
+            <div className="text-xl font-bold text-blue-600">{state.level}</div>
             <div className="text-xs text-gray-500">Level</div>
           </div>
           <div className="text-center">
-            <div className="text-xl font-bold text-green-600">{state.totalPoints}</div> {/* Smaller text */}
+            <div className="text-xl font-bold text-green-600">{state.totalPoints}</div>
             <div className="text-xs text-gray-500">Points</div>
           </div>
           <div className="text-center">
-            <div className="text-xl font-bold text-purple-600">{state.tasksCompleted}</div> {/* Smaller text */}
+            <div className="text-xl font-bold text-purple-600">{state.tasksCompleted}</div>
             <div className="text-xs text-gray-500">Tasks</div>
           </div>
           <div className="text-center">
-            <div className="text-xl font-bold text-orange-600">
-              {state.achievements.filter(a => a.unlocked).length}
-            </div> {/* Smaller text */}
-            <div className="text-xs text-gray-500">Badges</div>
+            <div className="text-xl font-bold text-orange-600 flex items-center justify-center gap-1">
+              {state.streak > 0 && <span>🔥</span>}
+              {state.streak}
+            </div>
+            <div className="text-xs text-gray-500">Day Streak</div>
           </div>
         </div>
 
         {/* Compact Level Progress Bar */}
-        <div className="mb-3"> {/* Reduced margin */}
+        <div className="mb-3">
           <div className="flex justify-between text-xs text-gray-500 mb-1">
             <span>Level {state.level}</span>
-            <span>{pointsToNextLevel} to next</span> {/* Shortened text */}
+            <span>{pointsToNextLevel} to next</span>
           </div>
-          <div className="w-full bg-gray-200 rounded-full h-1.5"> {/* Thinner progress bar */}
+          <div className="w-full bg-gray-200 rounded-full h-1.5">
             <div
               className="bg-gradient-to-r from-blue-500 to-purple-600 h-1.5 rounded-full transition-all duration-500"
               style={{ width: `${progressToNextLevel}%` }}
+            />
+          </div>
+        </div>
+
+        {/* Achievement Progress */}
+        <div className="mb-3 text-xs">
+          <div className="flex justify-between text-gray-500 mb-1">
+            <span>🏆 Achievements</span>
+            <span>{state.achievements.filter(a => a.unlocked).length} / {state.achievements.length}</span>
+          </div>
+          <div className="w-full bg-gray-200 rounded-full h-1.5">
+            <div
+              className="bg-gradient-to-r from-yellow-400 to-orange-500 h-1.5 rounded-full transition-all duration-500"
+              style={{ width: `${(state.achievements.filter(a => a.unlocked).length / state.achievements.length) * 100}%` }}
             />
           </div>
         </div>

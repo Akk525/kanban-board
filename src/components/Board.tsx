@@ -8,7 +8,7 @@ import {
 } from '@dnd-kit/core';
 import type { DragEndEvent, DragStartEvent } from '@dnd-kit/core';
 import { SortableContext, horizontalListSortingStrategy } from '@dnd-kit/sortable';
-import { Plus, Filter, Search, Palette } from 'lucide-react';
+import { Plus, Filter, Search, Palette, Archive as ArchiveIcon } from 'lucide-react';
 import { Column } from './Column';
 import { Card } from './Card';
 import { CreateCardModal } from './CreateCardModal';
@@ -17,6 +17,7 @@ import { FilterPanel, useCardFilters } from './FilterPanel';
 import { GameStats } from './GameStats';
 import { Celebration } from './Celebration';
 import { CategoryManager } from './CategoryManager';
+import { Archive } from './Archive';
 import { useBoardContext } from '../context/BoardContext';
 import { useGame } from '../context/GameContext';
 import { sampleBoard } from '../data/sampleData';
@@ -24,7 +25,7 @@ import type { Card as CardType } from '../types';
 
 export const Board: React.FC = () => {
   const { state, dispatch } = useBoardContext();
-  const { addPoints, addProgressPoints } = useGame();
+  const { addPoints, addProgressPoints, state: gameState } = useGame();
   const [activeCard, setActiveCard] = useState<CardType | null>(null);
   const [showCreateCard, setShowCreateCard] = useState(false);
   const [selectedColumnId, setSelectedColumnId] = useState<string>('');
@@ -34,7 +35,9 @@ export const Board: React.FC = () => {
   const [showFilters, setShowFilters] = useState(false);
   const [showCelebration, setShowCelebration] = useState(false);
   const [celebrationPoints, setCelebrationPoints] = useState(0);
+  const [celebrationAchievement, setCelebrationAchievement] = useState<string>('');
   const [showCategoryManager, setShowCategoryManager] = useState(false);
+  const [showArchive, setShowArchive] = useState(false);
   const { filters, setFilters, applyFilters } = useCardFilters();
 
   const sensors = useSensors(
@@ -94,9 +97,29 @@ export const Board: React.FC = () => {
       if (targetColumn.title.toLowerCase() === 'done') {
         // Task completed - trigger celebration
         const points = { low: 10, medium: 20, high: 35, urgent: 50 }[activeCard.priority];
+        const prevAchievementCount = gameState.achievements.filter(a => a.unlocked).length;
+        
         addPoints(activeCard.priority);
+        
+        // Check for newly unlocked achievements after a short delay
+        setTimeout(() => {
+          const newAchievementCount = gameState.achievements.filter(a => a.unlocked).length;
+          const newlyUnlocked = gameState.achievements
+            .filter(a => a.unlocked)
+            .sort((a, b) => (b.unlockedAt?.getTime() || 0) - (a.unlockedAt?.getTime() || 0))[0];
+          
+          if (newAchievementCount > prevAchievementCount && newlyUnlocked) {
+            setCelebrationAchievement(newlyUnlocked.title);
+          }
+        }, 100);
+        
         setCelebrationPoints(points);
         setShowCelebration(true);
+        
+        // Auto-archive the card after 3 seconds
+        setTimeout(() => {
+          dispatch({ type: 'ARCHIVE_CARD', payload: active.id as string });
+        }, 3000);
       } else if (targetColumn.title.toLowerCase().includes('progress')) {
         // Task moved to in progress
         addProgressPoints();
@@ -111,9 +134,17 @@ export const Board: React.FC = () => {
 
   const handleAddColumn = () => {
     const title = prompt('Enter column title:');
-    if (title) {
-      dispatch({ type: 'ADD_COLUMN', payload: { title } });
+    if (title?.trim()) {
+      dispatch({ type: 'ADD_COLUMN', payload: { title: title.trim() } });
     }
+  };
+
+  const handleDeleteColumn = (columnId: string) => {
+    dispatch({ type: 'DELETE_COLUMN', payload: columnId });
+  };
+
+  const handleRenameColumn = (columnId: string, newTitle: string) => {
+    dispatch({ type: 'UPDATE_COLUMN', payload: { id: columnId, title: newTitle } });
   };
 
   const handleCardClick = (card: CardType) => {
@@ -126,13 +157,14 @@ export const Board: React.FC = () => {
 
     let filteredCards: CardType[] = [];
     
-    // First apply search filter
+    // First filter out archived cards and apply search filter
     state.board.columns.forEach(column => {
       const searchFiltered = column.cards.filter(card =>
-        !searchTerm || 
+        !card.archived && // Exclude archived cards
+        (!searchTerm || 
         card.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
         card.description?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        card.labels.some(label => label.toLowerCase().includes(searchTerm.toLowerCase()))
+        card.labels.some(label => label.toLowerCase().includes(searchTerm.toLowerCase())))
       );
       filteredCards = [...filteredCards, ...searchFiltered];
     });
@@ -144,7 +176,7 @@ export const Board: React.FC = () => {
       ...state.board,
       columns: state.board.columns.map(column => ({
         ...column,
-        cards: column.cards.filter(card => advancedFiltered.includes(card)),
+        cards: column.cards.filter(card => !card.archived && advancedFiltered.includes(card)),
       })),
     };
   }, [state.board, searchTerm, filters, applyFilters]);
@@ -152,6 +184,11 @@ export const Board: React.FC = () => {
   if (!filteredBoard) {
     return <div className="flex items-center justify-center h-screen">Loading...</div>;
   }
+
+  // Get archived cards
+  const archivedCards = state.board?.columns
+    .flatMap(col => col.cards)
+    .filter(card => card.archived) || [];
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -194,6 +231,19 @@ export const Board: React.FC = () => {
               </button>
 
               <button 
+                className="btn-secondary flex items-center gap-1 text-xs px-3 py-1.5 relative"
+                onClick={() => setShowArchive(true)}
+              >
+                <ArchiveIcon size={14} />
+                Archive
+                {archivedCards.length > 0 && (
+                  <span className="absolute -top-1 -right-1 bg-blue-500 text-white text-xs rounded-full w-5 h-5 flex items-center justify-center">
+                    {archivedCards.length}
+                  </span>
+                )}
+              </button>
+
+              <button 
                 className="btn-secondary flex items-center gap-1 text-xs px-3 py-1.5"
                 onClick={() => setShowCategoryManager(true)}
               >
@@ -233,6 +283,8 @@ export const Board: React.FC = () => {
                     categories={state.board?.categories}
                     onAddCard={handleAddCard}
                     onCardClick={handleCardClick}
+                    onDeleteColumn={handleDeleteColumn}
+                    onRenameColumn={handleRenameColumn}
                   />
                 ))}
               </SortableContext>
@@ -282,8 +334,12 @@ export const Board: React.FC = () => {
       {/* Celebration Animation */}
       <Celebration
         show={showCelebration}
-        onComplete={() => setShowCelebration(false)}
+        onComplete={() => {
+          setShowCelebration(false);
+          setCelebrationAchievement('');
+        }}
         points={celebrationPoints}
+        achievementUnlocked={celebrationAchievement}
       />
 
       {/* Category Manager */}
@@ -309,6 +365,22 @@ export const Board: React.FC = () => {
               type: 'DELETE_CATEGORY',
               payload: { id }
             });
+          }}
+        />
+      )}
+
+      {/* Archive */}
+      {showArchive && (
+        <Archive
+          isOpen={showArchive}
+          onClose={() => setShowArchive(false)}
+          cards={archivedCards}
+          categories={state.board?.categories}
+          onRestore={(cardId) => {
+            dispatch({ type: 'RESTORE_CARD', payload: cardId });
+          }}
+          onDelete={(cardId) => {
+            dispatch({ type: 'DELETE_CARD', payload: cardId });
           }}
         />
       )}

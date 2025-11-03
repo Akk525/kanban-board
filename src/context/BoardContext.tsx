@@ -14,6 +14,8 @@ type BoardAction =
   | { type: 'ADD_CARD'; payload: CreateCardData }
   | { type: 'UPDATE_CARD'; payload: UpdateCardData }
   | { type: 'DELETE_CARD'; payload: string }
+  | { type: 'ARCHIVE_CARD'; payload: string }
+  | { type: 'RESTORE_CARD'; payload: string }
   | { type: 'MOVE_CARD'; payload: { cardId: string; sourceColumnId: string; targetColumnId: string; newOrder: number } }
   | { type: 'ADD_COLUMN'; payload: { title: string } }
   | { type: 'UPDATE_COLUMN'; payload: { id: string; title: string } }
@@ -108,6 +110,42 @@ function boardReducer(state: BoardState, action: BoardAction): BoardState {
         columns: state.board.columns.map(column => ({
           ...column,
           cards: column.cards.filter(card => card.id !== action.payload),
+        })),
+      };
+
+      return { ...state, board: updatedBoard };
+    }
+
+    case 'ARCHIVE_CARD': {
+      if (!state.board) return state;
+
+      const updatedBoard = {
+        ...state.board,
+        columns: state.board.columns.map(column => ({
+          ...column,
+          cards: column.cards.map(card =>
+            card.id === action.payload
+              ? { ...card, archived: true, archivedAt: new Date() }
+              : card
+          ),
+        })),
+      };
+
+      return { ...state, board: updatedBoard };
+    }
+
+    case 'RESTORE_CARD': {
+      if (!state.board) return state;
+
+      const updatedBoard = {
+        ...state.board,
+        columns: state.board.columns.map(column => ({
+          ...column,
+          cards: column.cards.map(card =>
+            card.id === action.payload
+              ? { ...card, archived: false, archivedAt: undefined }
+              : card
+          ),
         })),
       };
 

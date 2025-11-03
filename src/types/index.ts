@@ -35,6 +35,9 @@ export interface Card {
   comments: Comment[];
   columnId: string;
   order: number;
+  archived?: boolean;
+  archivedAt?: Date;
+  completedAt?: Date;
 }
 
 export interface Column {

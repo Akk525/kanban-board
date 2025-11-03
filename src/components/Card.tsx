@@ -1,8 +1,9 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
-import { Calendar, MessageCircle, Tag } from 'lucide-react';
+import { Calendar, MessageCircle, Tag, Trash2 } from 'lucide-react';
 import { format } from 'date-fns';
+import { useBoardContext } from '../context/BoardContext';
 import type { Card as CardType, Category } from '../types';
 
 interface CardProps {
@@ -19,6 +20,8 @@ const priorityColors = {
 };
 
 export const Card: React.FC<CardProps> = ({ card, categories = [], onCardClick }) => {
+  const { dispatch } = useBoardContext();
+  const [showDelete, setShowDelete] = useState(false);
   const {
     attributes,
     listeners,
@@ -39,10 +42,21 @@ export const Card: React.FC<CardProps> = ({ card, categories = [], onCardClick }
     new Date(card.dueDate) > new Date() && 
     new Date(card.dueDate) <= new Date(Date.now() + 3 * 24 * 60 * 60 * 1000); // 3 days
 
-  const handleClick = () => {
-    // Only open details if not dragging and click is on the card itself
+  const handleClick = (e: React.MouseEvent) => {
+    // Prevent opening details when clicking delete button
+    if ((e.target as HTMLElement).closest('.delete-btn')) {
+      return;
+    }
+    // Only open details if not dragging
     if (!isDragging && onCardClick) {
       onCardClick(card);
+    }
+  };
+
+  const handleDelete = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (window.confirm(`Delete "${card.title}"?`)) {
+      dispatch({ type: 'DELETE_CARD', payload: card.id });
     }
   };
 
@@ -66,12 +80,26 @@ export const Card: React.FC<CardProps> = ({ card, categories = [], onCardClick }
       {...attributes}
       {...listeners}
       onClick={handleClick}
-      className={`card mb-2 ${isDragging ? 'opacity-50' : ''} ${dueDateBorderClass}`}
+      onMouseEnter={() => setShowDelete(true)}
+      onMouseLeave={() => setShowDelete(false)}
+      className={`card mb-2 relative ${isDragging ? 'opacity-50' : ''} ${dueDateBorderClass}`}
     >
+      {/* Delete Button */}
+      {showDelete && !isDragging && (
+        <button
+          onClick={handleDelete}
+          className="delete-btn absolute top-2 right-2 p-1 bg-red-500 text-white rounded-full opacity-0 hover:opacity-100 hover:bg-red-600 transition-all duration-200 z-10 shadow-lg"
+          style={{ opacity: showDelete ? 1 : 0 }}
+          title="Delete card"
+        >
+          <Trash2 size={12} />
+        </button>
+      )}
+
       <div className="flex justify-between items-start mb-2">
-        <h3 className="font-medium text-gray-900 text-xs">{card.title}</h3>
+        <h3 className="font-medium text-gray-900 text-xs pr-6">{card.title}</h3>
         <span
-          className={`px-1.5 py-0.5 text-xs font-medium rounded-full ${
+          className={`px-1.5 py-0.5 text-xs font-medium rounded-full flex-shrink-0 ${
             priorityColors[card.priority]
           }`}
         >

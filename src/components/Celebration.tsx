@@ -20,16 +20,20 @@ export const Celebration: React.FC<CelebrationProps> = ({
       setVisible(true);
       const timer = setTimeout(() => {
         setVisible(false);
-        onComplete();
+        setTimeout(() => {
+          onComplete();
+        }, 300); // Small delay to allow fade-out animation
       }, 3000);
       return () => clearTimeout(timer);
+    } else {
+      setVisible(false);
     }
   }, [show, onComplete]);
 
-  if (!visible) return null;
+  if (!show && !visible) return null;
 
   return (
-    <div className="fixed inset-0 pointer-events-none z-50 flex items-center justify-center">
+    <div className={`fixed inset-0 pointer-events-none z-50 flex items-center justify-center transition-opacity duration-300 ${visible ? 'opacity-100' : 'opacity-0'}`}>
       {/* Confetti Animation */}
       <div className="absolute inset-0">
         {[...Array(20)].map((_, i) => (
@@ -54,7 +58,7 @@ export const Celebration: React.FC<CelebrationProps> = ({
       </div>
 
       {/* Main Celebration Message */}
-      <div className="bg-white rounded-2xl shadow-2xl p-8 text-center transform animate-pulse border-4 border-green-400">
+      <div className="bg-white rounded-2xl shadow-2xl p-8 text-center transform animate-scaleIn border-4 border-green-400">
         <div className="text-6xl mb-4">🎉</div>
         <h2 className="text-2xl font-bold text-gray-900 mb-2">Task Completed!</h2>
         <div className="flex items-center justify-center gap-2 text-lg font-semibold text-green-600 mb-4">
