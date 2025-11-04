@@ -47,6 +47,15 @@ export interface Column {
   cards: Card[];
 }
 
+export interface BoardMetadata {
+  id: string;
+  name: string;
+  description?: string;
+  color: string;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
 export interface Board {
   id: string;
   title: string;

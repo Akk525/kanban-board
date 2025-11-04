@@ -18,6 +18,9 @@ import { GameStats } from './GameStats';
 import { Celebration } from './Celebration';
 import { CategoryManager } from './CategoryManager';
 import { Archive } from './Archive';
+import { BoardSelector } from './BoardSelector';
+import { BoardManager } from './BoardManager';
+import { InputModal } from './InputModal';
 import { useBoardContext } from '../context/BoardContext';
 import { useGame } from '../context/GameContext';
 import { sampleBoard } from '../data/sampleData';
@@ -38,6 +41,9 @@ export const Board: React.FC = () => {
   const [celebrationAchievement, setCelebrationAchievement] = useState<string>('');
   const [showCategoryManager, setShowCategoryManager] = useState(false);
   const [showArchive, setShowArchive] = useState(false);
+  const [showBoardManager, setShowBoardManager] = useState(false);
+  const [showCreateBoardModal, setShowCreateBoardModal] = useState(false);
+  const [showAddColumnModal, setShowAddColumnModal] = useState(false);
   const { filters, setFilters, applyFilters } = useCardFilters();
 
   const sensors = useSensors(
@@ -48,15 +54,36 @@ export const Board: React.FC = () => {
     })
   );
 
+  // Initialize with sample board if no boards exist
   useEffect(() => {
-    if (!state.board) {
-      dispatch({ type: 'SET_BOARD', payload: sampleBoard });
+    if (state.boards.length === 0 && state.boardMetadata.length === 0) {
+      // Create initial board with sample data
+      const boardMetadata = {
+        id: sampleBoard.id,
+        name: sampleBoard.title,
+        description: sampleBoard.description,
+        color: '#3B82F6',
+        createdAt: sampleBoard.createdAt,
+        updatedAt: sampleBoard.updatedAt,
+      };
+      
+      dispatch({ 
+        type: 'SET_BOARDS', 
+        payload: { 
+          boards: [sampleBoard], 
+          metadata: [boardMetadata]
+        } 
+      });
     }
-  }, [state.board, dispatch]);
+  }, []); // Run only once on mount
+
+  // Get active board
+  const activeBoard = state.boards.find(b => b.id === state.activeBoardId);
+  const activeBoardMetadata = state.boardMetadata.find(m => m.id === state.activeBoardId);
 
   const handleDragStart = (event: DragStartEvent) => {
     const { active } = event;
-    const card = state.board?.columns
+    const card = activeBoard?.columns
       .flatMap(col => col.cards)
       .find(card => card.id === active.id);
     setActiveCard(card || null);
@@ -68,17 +95,17 @@ export const Board: React.FC = () => {
 
     if (!over || active.id === over.id) return;
 
-    const activeCard = state.board?.columns
+    const activeCard = activeBoard?.columns
       .flatMap(col => col.cards)
       .find(card => card.id === active.id);
 
     if (!activeCard) return;
 
-    const sourceColumn = state.board?.columns.find(col => 
+    const sourceColumn = activeBoard?.columns.find(col => 
       col.cards.some(card => card.id === active.id)
     );
     
-    const targetColumn = state.board?.columns.find(col => col.id === over.id);
+    const targetColumn = activeBoard?.columns.find(col => col.id === over.id);
 
     if (!sourceColumn || !targetColumn) return;
 
@@ -133,10 +160,7 @@ export const Board: React.FC = () => {
   };
 
   const handleAddColumn = () => {
-    const title = prompt('Enter column title:');
-    if (title?.trim()) {
-      dispatch({ type: 'ADD_COLUMN', payload: { title: title.trim() } });
-    }
+    setShowAddColumnModal(true);
   };
 
   const handleDeleteColumn = (columnId: string) => {
@@ -153,12 +177,12 @@ export const Board: React.FC = () => {
   };
 
   const filteredBoard = React.useMemo(() => {
-    if (!state.board) return state.board;
+    if (!activeBoard) return null;
 
     let filteredCards: CardType[] = [];
     
     // First filter out archived cards and apply search filter
-    state.board.columns.forEach(column => {
+    activeBoard.columns.forEach(column => {
       const searchFiltered = column.cards.filter(card =>
         !card.archived && // Exclude archived cards
         (!searchTerm || 
@@ -173,22 +197,29 @@ export const Board: React.FC = () => {
     const advancedFiltered = applyFilters(filteredCards);
 
     return {
-      ...state.board,
-      columns: state.board.columns.map(column => ({
+      ...activeBoard,
+      columns: activeBoard.columns.map(column => ({
         ...column,
         cards: column.cards.filter(card => !card.archived && advancedFiltered.includes(card)),
       })),
     };
-  }, [state.board, searchTerm, filters, applyFilters]);
-
-  if (!filteredBoard) {
-    return <div className="flex items-center justify-center h-screen">Loading...</div>;
-  }
+  }, [activeBoard, searchTerm, filters, applyFilters]);
 
   // Get archived cards
-  const archivedCards = state.board?.columns
+  const archivedCards = activeBoard?.columns
     .flatMap(col => col.cards)
     .filter(card => card.archived) || [];
+
+  // Show loading only if we're still initializing
+  if (!filteredBoard || !activeBoardMetadata) {
+    // If boards exist but no active board, something is wrong
+    if (state.boards.length > 0 && !state.activeBoardId) {
+      // Set the first board as active
+      dispatch({ type: 'SET_ACTIVE_BOARD', payload: state.boards[0].id });
+      return <div className="flex items-center justify-center h-screen">Loading...</div>;
+    }
+    return <div className="flex items-center justify-center h-screen">Loading...</div>;
+  }
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -203,11 +234,23 @@ export const Board: React.FC = () => {
       <div className="bg-white shadow-sm border-b border-gray-200 py-3">
         <div className="max-w-7xl mx-auto px-4">
           <div className="flex items-center justify-between">
-            <div>
-              <h1 className="text-xl font-bold text-gray-900">{filteredBoard.title}</h1>
-              {filteredBoard.description && (
-                <p className="text-gray-600 text-xs">{filteredBoard.description}</p>
-              )}
+            <div className="flex items-center gap-4">
+              {/* Board Selector */}
+              <BoardSelector
+                boards={state.boardMetadata}
+                activeBoard={activeBoardMetadata}
+                onSelectBoard={(boardId) => {
+                  dispatch({ type: 'SET_ACTIVE_BOARD', payload: boardId });
+                }}
+                onCreateBoard={() => setShowCreateBoardModal(true)}
+                onManageBoards={() => setShowBoardManager(true)}
+              />
+              
+              <div>
+                {filteredBoard.description && (
+                  <p className="text-gray-600 text-xs">{filteredBoard.description}</p>
+                )}
+              </div>
             </div>
             
             <div className="flex items-center gap-2">
@@ -280,7 +323,7 @@ export const Board: React.FC = () => {
                   <Column
                     key={column.id}
                     column={column}
-                    categories={state.board?.categories}
+                    categories={activeBoard?.categories}
                     onAddCard={handleAddCard}
                     onCardClick={handleCardClick}
                     onDeleteColumn={handleDeleteColumn}
@@ -292,7 +335,7 @@ export const Board: React.FC = () => {
 
             <DragOverlay>
               {activeCard && (
-                <Card card={activeCard} categories={state.board?.categories} />
+                <Card card={activeCard} categories={activeBoard?.categories} />
               )}
             </DragOverlay>
           </DndContext>
@@ -306,7 +349,7 @@ export const Board: React.FC = () => {
           onClose={() => setShowCreateCard(false)}
           columnId={selectedColumnId}
           users={state.users}
-          categories={state.board?.categories}
+          categories={activeBoard?.categories}
         />
       )}
 
@@ -347,7 +390,7 @@ export const Board: React.FC = () => {
         <CategoryManager
           isOpen={showCategoryManager}
           onClose={() => setShowCategoryManager(false)}
-          categories={state.board?.categories || []}
+          categories={activeBoard?.categories || []}
           onAddCategory={(name, color) => {
             dispatch({
               type: 'ADD_CATEGORY',
@@ -375,7 +418,7 @@ export const Board: React.FC = () => {
           isOpen={showArchive}
           onClose={() => setShowArchive(false)}
           cards={archivedCards}
-          categories={state.board?.categories}
+          categories={activeBoard?.categories}
           onRestore={(cardId) => {
             dispatch({ type: 'RESTORE_CARD', payload: cardId });
           }}
@@ -384,6 +427,67 @@ export const Board: React.FC = () => {
           }}
         />
       )}
+
+      {/* Board Manager */}
+      {showBoardManager && (
+        <BoardManager
+          isOpen={showBoardManager}
+          onClose={() => setShowBoardManager(false)}
+          boards={state.boardMetadata}
+          activeBoardId={state.activeBoardId || ''}
+          onCreateBoard={(name, description, color) => {
+            dispatch({
+              type: 'CREATE_BOARD',
+              payload: { name, description, color },
+            });
+          }}
+          onUpdateBoard={(id, name, description, color) => {
+            dispatch({
+              type: 'UPDATE_BOARD_METADATA',
+              payload: { id, name, description, color },
+            });
+          }}
+          onDeleteBoard={(id) => {
+            dispatch({
+              type: 'DELETE_BOARD',
+              payload: id,
+            });
+          }}
+        />
+      )}
+
+      {/* Create Board Modal */}
+      <InputModal
+        isOpen={showCreateBoardModal}
+        onClose={() => setShowCreateBoardModal(false)}
+        onConfirm={(name) => {
+          dispatch({
+            type: 'CREATE_BOARD',
+            payload: {
+              name,
+              description: '',
+              color: '#3B82F6',
+            },
+          });
+        }}
+        title="Create New Board"
+        label="Board Name"
+        placeholder="Enter board name..."
+        confirmText="Create Board"
+      />
+
+      {/* Add Column Modal */}
+      <InputModal
+        isOpen={showAddColumnModal}
+        onClose={() => setShowAddColumnModal(false)}
+        onConfirm={(title) => {
+          dispatch({ type: 'ADD_COLUMN', payload: { title } });
+        }}
+        title="Add New Column"
+        label="Column Title"
+        placeholder="e.g., To Do, In Progress, Done..."
+        confirmText="Add Column"
+      />
     </div>
   );
 };
