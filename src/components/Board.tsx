@@ -21,6 +21,8 @@ import { Archive } from './Archive';
 import { BoardSelector } from './BoardSelector';
 import { BoardManager } from './BoardManager';
 import { InputModal } from './InputModal';
+import { ViewTabs, type ViewType } from './ViewTabs';
+import { GanttView } from './Gantt/GanttView';
 import { useBoardContext } from '../context/BoardContext';
 import { useGame } from '../context/GameContext';
 import { sampleBoard } from '../data/sampleData';
@@ -44,6 +46,7 @@ export const Board: React.FC = () => {
   const [showBoardManager, setShowBoardManager] = useState(false);
   const [showCreateBoardModal, setShowCreateBoardModal] = useState(false);
   const [showAddColumnModal, setShowAddColumnModal] = useState(false);
+  const [activeView, setActiveView] = useState<ViewType>('kanban');
   const { filters, setFilters, applyFilters } = useCardFilters();
 
   const sensors = useSensors(
@@ -306,39 +309,54 @@ export const Board: React.FC = () => {
         </div>
       </div>
 
+      {/* View Tabs */}
+      <div className="bg-white border-b border-gray-200 py-3">
+        <div className="max-w-7xl mx-auto px-4">
+          <ViewTabs activeView={activeView} onViewChange={setActiveView} />
+        </div>
+      </div>
+
       {/* Board */}
       <div className="p-4">
         <div className="max-w-7xl mx-auto">
-          <DndContext
-            sensors={sensors}
-            onDragStart={handleDragStart}
-            onDragEnd={handleDragEnd}
-          >
-            <div className="flex gap-4 overflow-x-auto pb-4">
-              <SortableContext
-                items={filteredBoard.columns.map(col => col.id)}
-                strategy={horizontalListSortingStrategy}
-              >
-                {filteredBoard.columns.map(column => (
-                  <Column
-                    key={column.id}
-                    column={column}
-                    categories={activeBoard?.categories}
-                    onAddCard={handleAddCard}
-                    onCardClick={handleCardClick}
-                    onDeleteColumn={handleDeleteColumn}
-                    onRenameColumn={handleRenameColumn}
-                  />
-                ))}
-              </SortableContext>
-            </div>
+          {activeView === 'kanban' ? (
+            <DndContext
+              sensors={sensors}
+              onDragStart={handleDragStart}
+              onDragEnd={handleDragEnd}
+            >
+              <div className="flex gap-4 overflow-x-auto pb-4">
+                <SortableContext
+                  items={filteredBoard.columns.map(col => col.id)}
+                  strategy={horizontalListSortingStrategy}
+                >
+                  {filteredBoard.columns.map(column => (
+                    <Column
+                      key={column.id}
+                      column={column}
+                      categories={activeBoard?.categories}
+                      onAddCard={handleAddCard}
+                      onCardClick={handleCardClick}
+                      onDeleteColumn={handleDeleteColumn}
+                      onRenameColumn={handleRenameColumn}
+                    />
+                  ))}
+                </SortableContext>
+              </div>
 
-            <DragOverlay>
-              {activeCard && (
-                <Card card={activeCard} categories={activeBoard?.categories} />
-              )}
-            </DragOverlay>
-          </DndContext>
+              <DragOverlay>
+                {activeCard && (
+                  <Card card={activeCard} categories={activeBoard?.categories} />
+                )}
+              </DragOverlay>
+            </DndContext>
+          ) : (
+            <GanttView 
+              cards={filteredBoard.columns.flatMap(col => col.cards)}
+              users={state.users}
+              onCardClick={handleCardClick}
+            />
+          )}
         </div>
       </div>
 

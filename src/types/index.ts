@@ -29,6 +29,7 @@ export interface Card {
   priority: 'low' | 'medium' | 'high' | 'urgent';
   labels: string[];
   categoryId?: string;
+  startDate?: Date;
   dueDate?: Date;
   createdAt: Date;
   updatedAt: Date;
@@ -38,6 +39,8 @@ export interface Card {
   archived?: boolean;
   archivedAt?: Date;
   completedAt?: Date;
+  estimateHours?: number;
+  dependencies?: string[];
 }
 
 export interface Column {
@@ -74,8 +77,10 @@ export interface CreateCardData {
   priority: Card['priority'];
   labels: string[];
   categoryId?: string;
+  startDate?: Date;
   dueDate?: Date;
   columnId: string;
+  estimateHours?: number;
 }
 
 export interface UpdateCardData extends Partial<CreateCardData> {

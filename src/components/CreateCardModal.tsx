@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { X, Calendar, User, Tag, Palette } from 'lucide-react';
+import { X, Calendar, User, Tag, Clock } from 'lucide-react';
 import { useBoardContext } from '../context/BoardContext';
 import type { User as UserType, CreateCardData, Category } from '../types';
 
@@ -26,7 +26,9 @@ export const CreateCardModal: React.FC<CreateCardModalProps> = ({
     priority: 'medium',
     labels: [],
     categoryId: '',
+    startDate: undefined,
     dueDate: undefined,
+    estimateHours: undefined,
   });
   const [newLabel, setNewLabel] = useState('');
 
@@ -43,7 +45,9 @@ export const CreateCardModal: React.FC<CreateCardModalProps> = ({
         columnId,
         assigneeId: formData.assigneeId || undefined,
         categoryId: formData.categoryId || undefined,
+        startDate: formData.startDate ? new Date(formData.startDate) : undefined,
         dueDate: formData.dueDate ? new Date(formData.dueDate) : undefined,
+        estimateHours: formData.estimateHours || undefined,
       },
     });
 
@@ -55,7 +59,9 @@ export const CreateCardModal: React.FC<CreateCardModalProps> = ({
       priority: 'medium',
       labels: [],
       categoryId: '',
+      startDate: undefined,
       dueDate: undefined,
+      estimateHours: undefined,
     });
     setNewLabel('');
     onClose();
@@ -189,19 +195,56 @@ export const CreateCardModal: React.FC<CreateCardModalProps> = ({
             </select>
           </div>
 
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                <Calendar size={16} className="inline mr-1" />
+                Start Date
+              </label>
+              <input
+                type="date"
+                value={formData.startDate ? new Date(formData.startDate).toISOString().split('T')[0] : ''}
+                onChange={(e) => setFormData(prev => ({ 
+                  ...prev, 
+                  startDate: e.target.value ? new Date(e.target.value) : undefined 
+                }))}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+              />
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                <Calendar size={16} className="inline mr-1" />
+                Due Date
+              </label>
+              <input
+                type="date"
+                value={formData.dueDate ? new Date(formData.dueDate).toISOString().split('T')[0] : ''}
+                onChange={(e) => setFormData(prev => ({ 
+                  ...prev, 
+                  dueDate: e.target.value ? new Date(e.target.value) : undefined 
+                }))}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+              />
+            </div>
+          </div>
+
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
-              <Calendar size={16} className="inline mr-1" />
-              Due Date
+              <Clock size={16} className="inline mr-1" />
+              Estimate (hours)
             </label>
             <input
-              type="date"
-              value={formData.dueDate ? new Date(formData.dueDate).toISOString().split('T')[0] : ''}
+              type="number"
+              min="0"
+              step="0.5"
+              value={formData.estimateHours || ''}
               onChange={(e) => setFormData(prev => ({ 
                 ...prev, 
-                dueDate: e.target.value ? new Date(e.target.value) : undefined 
+                estimateHours: e.target.value ? parseFloat(e.target.value) : undefined 
               }))}
               className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+              placeholder="e.g., 4.5"
             />
           </div>
 
