@@ -9,6 +9,7 @@ import {
 import type { DragEndEvent, DragStartEvent } from '@dnd-kit/core';
 import { SortableContext, horizontalListSortingStrategy } from '@dnd-kit/sortable';
 import { Plus, Filter, Search, Palette, Archive as ArchiveIcon } from 'lucide-react';
+import clsx from 'clsx';
 import { Column } from './Column';
 import { Card } from './Card';
 import { CreateCardModal } from './CreateCardModal';
@@ -23,6 +24,9 @@ import { BoardManager } from './BoardManager';
 import { InputModal } from './InputModal';
 import { ViewTabs, type ViewType } from './ViewTabs';
 import { GanttView } from './Gantt/GanttView';
+import { DashboardView } from './Dashboard/DashboardView';
+import { TableView } from './Table/TableView';
+import { CalendarView } from './Calendar/CalendarView';
 import { useBoardContext } from '../context/BoardContext';
 import { useGame } from '../context/GameContext';
 import { sampleBoard } from '../data/sampleData';
@@ -225,7 +229,7 @@ export const Board: React.FC = () => {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-gray-50 flex flex-col">
       {/* Compact Game Stats */}
       <div className="bg-white shadow-sm border-b border-gray-200 py-2">
         <div className="max-w-7xl mx-auto px-4">
@@ -317,8 +321,13 @@ export const Board: React.FC = () => {
       </div>
 
       {/* Board */}
-      <div className="p-4">
-        <div className="max-w-7xl mx-auto">
+      <div className={clsx(
+        "flex-1",
+        activeView === 'table' || activeView === 'calendar' ? "flex flex-col" : "p-4"
+      )}>
+        <div className={clsx(
+          activeView === 'table' || activeView === 'calendar' ? "h-full" : "max-w-7xl mx-auto"
+        )}>
           {activeView === 'kanban' ? (
             <DndContext
               sensors={sensors}
@@ -350,11 +359,44 @@ export const Board: React.FC = () => {
                 )}
               </DragOverlay>
             </DndContext>
-          ) : (
+          ) : activeView === 'gantt' ? (
             <GanttView 
               cards={filteredBoard.columns.flatMap(col => col.cards)}
               users={state.users}
               onCardClick={handleCardClick}
+            />
+          ) : activeView === 'table' ? (
+            <TableView
+              cards={filteredBoard.columns.flatMap(col => col.cards)}
+              columns={filteredBoard.columns}
+              users={state.users}
+              onCardClick={handleCardClick}
+            />
+          ) : activeView === 'calendar' ? (
+            <CalendarView
+              cards={filteredBoard.columns.flatMap(col => col.cards)}
+              columns={filteredBoard.columns}
+              users={state.users}
+              onCardClick={handleCardClick}
+              onCreateCard={(_date) => {
+                // Find first column to add card to
+                const firstColumn = filteredBoard.columns[0];
+                if (firstColumn) {
+                  setSelectedColumnId(firstColumn.id);
+                  setShowCreateCard(true);
+                }
+              }}
+            />
+          ) : (
+            <DashboardView
+              boards={state.boards}
+              boardsMetadata={state.boardMetadata}
+              allCards={state.boards.flatMap(b => b.columns.flatMap(col => col.cards))}
+              users={state.users}
+              activeBoardId={state.activeBoardId}
+              onBoardSelect={(boardId) => dispatch({ type: 'SET_ACTIVE_BOARD', payload: boardId })}
+              onCreateBoard={() => setShowCreateBoardModal(true)}
+              onSwitchToKanban={() => setActiveView('kanban')}
             />
           )}
         </div>

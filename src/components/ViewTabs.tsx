@@ -1,8 +1,8 @@
 import React from 'react';
-import { LayoutGrid, GanttChart } from 'lucide-react';
+import { LayoutGrid, GanttChart, BarChart3, Table, Calendar } from 'lucide-react';
 import clsx from 'clsx';
 
-export type ViewType = 'kanban' | 'gantt';
+export type ViewType = 'kanban' | 'gantt' | 'dashboard' | 'table' | 'calendar';
 
 interface ViewTabsProps {
   activeView: ViewType;
@@ -11,7 +11,10 @@ interface ViewTabsProps {
 
 const views: Array<{ id: ViewType; label: string; icon: React.ReactNode }> = [
   { id: 'kanban', label: 'Kanban', icon: <LayoutGrid className="w-4 h-4" /> },
+  { id: 'table', label: 'Table', icon: <Table className="w-4 h-4" /> },
+  { id: 'calendar', label: 'Calendar', icon: <Calendar className="w-4 h-4" /> },
   { id: 'gantt', label: 'Gantt', icon: <GanttChart className="w-4 h-4" /> },
+  { id: 'dashboard', label: 'Dashboard', icon: <BarChart3 className="w-4 h-4" /> },
 ];
 
 export const ViewTabs: React.FC<ViewTabsProps> = ({ activeView, onViewChange }) => {

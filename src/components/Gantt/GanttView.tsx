@@ -30,12 +30,12 @@ export const GanttView: React.FC<GanttViewProps> = ({ cards, users, onCardClick 
     if (zoomLevel === 'week') {
       return {
         start: startOfWeek(currentDate, { weekStartsOn: 0 }),
-        end: endOfWeek(addWeeks(currentDate, 3), { weekStartsOn: 0 })
+        end: endOfWeek(addWeeks(currentDate, 1), { weekStartsOn: 0 }) // 2 weeks for better spacing
       };
     } else {
       return {
         start: startOfMonth(currentDate),
-        end: endOfMonth(addMonths(currentDate, 2))
+        end: endOfMonth(currentDate) // Single month for better spacing
       };
     }
   };
@@ -95,76 +95,99 @@ export const GanttView: React.FC<GanttViewProps> = ({ cards, users, onCardClick 
     ? ((differenceInDays(today, start)) / days.length) * 100 
     : -1;
 
+  // Calculate dynamic column width based on zoom level
+  const dayColumnWidth = zoomLevel === 'week' ? 80 : 50; // Wider for week view
+  const minTotalWidth = days.length * dayColumnWidth;
+
   return (
-    <div className="bg-white rounded-lg shadow p-6">
+    <div className="bg-white rounded-lg shadow-lg p-8">
       {/* Header Controls */}
-      <div className="flex items-center justify-between mb-6">
-        <div className="flex items-center gap-4">
-          <h2 className="text-2xl font-bold">Gantt Chart</h2>
-          <div className="flex items-center gap-2">
+      <div className="flex items-center justify-between mb-8">
+        <div className="flex items-center gap-6">
+          <h2 className="text-3xl font-bold text-gray-800">Gantt Chart</h2>
+          <div className="flex items-center gap-3 bg-gray-50 rounded-lg px-4 py-2">
             <button
               onClick={() => navigate('prev')}
-              className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
+              className="p-2 hover:bg-white rounded-lg transition-all shadow-sm hover:shadow"
               aria-label="Previous period"
             >
-              <ChevronLeft className="w-5 h-5" />
+              <ChevronLeft className="w-5 h-5 text-gray-600" />
             </button>
-            <span className="font-medium px-4">
+            <span className="font-semibold px-4 text-gray-700 min-w-[240px] text-center">
               {format(start, 'MMM d')} - {format(end, 'MMM d, yyyy')}
             </span>
             <button
               onClick={() => navigate('next')}
-              className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
+              className="p-2 hover:bg-white rounded-lg transition-all shadow-sm hover:shadow"
               aria-label="Next period"
             >
-              <ChevronRight className="w-5 h-5" />
+              <ChevronRight className="w-5 h-5 text-gray-600" />
             </button>
           </div>
         </div>
 
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-3 bg-gray-50 rounded-lg p-1">
           <button
             onClick={() => setZoomLevel('week')}
-            className={`px-3 py-2 rounded-lg transition-colors flex items-center gap-1 ${
-              zoomLevel === 'week' ? 'bg-blue-100 text-blue-700' : 'hover:bg-gray-100'
+            className={`px-4 py-2.5 rounded-lg transition-all flex items-center gap-2 font-medium ${
+              zoomLevel === 'week' 
+                ? 'bg-blue-600 text-white shadow-md' 
+                : 'hover:bg-white text-gray-600'
             }`}
           >
             <ZoomIn className="w-4 h-4" />
-            Week
+            Week View
           </button>
           <button
             onClick={() => setZoomLevel('month')}
-            className={`px-3 py-2 rounded-lg transition-colors flex items-center gap-1 ${
-              zoomLevel === 'month' ? 'bg-blue-100 text-blue-700' : 'hover:bg-gray-100'
+            className={`px-4 py-2.5 rounded-lg transition-all flex items-center gap-2 font-medium ${
+              zoomLevel === 'month' 
+                ? 'bg-blue-600 text-white shadow-md' 
+                : 'hover:bg-white text-gray-600'
             }`}
           >
             <ZoomOut className="w-4 h-4" />
-            Month
+            Month View
           </button>
         </div>
       </div>
 
       {/* Timeline Grid */}
-      <div className="relative overflow-x-auto">
-        <div className="min-w-[800px]">
+      <div className="relative overflow-x-auto border border-gray-200 rounded-lg">
+        <div style={{ minWidth: `${minTotalWidth}px` }}>
           {/* Date Headers */}
-          <div className="flex border-b border-gray-200 mb-4 pb-2">
+          <div className="flex border-b-2 border-gray-300 bg-gradient-to-b from-gray-50 to-white sticky top-0 z-20">
+            <div className="w-64 flex-shrink-0 border-r-2 border-gray-300 px-6 py-4">
+              <div className="font-semibold text-gray-700">Task</div>
+              <div className="text-xs text-gray-500 mt-1">Assignee</div>
+            </div>
             {days.map((day, index) => {
               const isWeekend = day.getDay() === 0 || day.getDay() === 6;
               const isToday = isSameDay(day, today);
+              const isMonthStart = day.getDate() === 1;
               
               return (
                 <div
                   key={index}
-                  className={`flex-1 text-center text-sm ${
-                    isWeekend ? 'bg-gray-50' : ''
-                  } ${isToday ? 'bg-blue-50' : ''}`}
-                  style={{ minWidth: '40px' }}
+                  className={`text-center border-r border-gray-200 py-4 transition-colors ${
+                    isWeekend ? 'bg-gray-50' : 'bg-white'
+                  } ${isToday ? 'bg-blue-50 border-blue-300' : ''}`}
+                  style={{ 
+                    minWidth: `${dayColumnWidth}px`,
+                    width: `${dayColumnWidth}px`
+                  }}
                 >
-                  <div className={`font-medium ${isToday ? 'text-blue-600' : ''}`}>
+                  <div className={`font-bold text-base ${isToday ? 'text-blue-600' : 'text-gray-800'}`}>
                     {format(day, 'd')}
                   </div>
-                  <div className="text-gray-500 text-xs">{format(day, 'EEE')}</div>
+                  <div className={`text-xs mt-1 ${isToday ? 'text-blue-600 font-medium' : 'text-gray-500'}`}>
+                    {format(day, 'EEE')}
+                  </div>
+                  {isMonthStart && (
+                    <div className="text-xs font-semibold text-gray-600 mt-1">
+                      {format(day, 'MMM')}
+                    </div>
+                  )}
                 </div>
               );
             })}
@@ -173,43 +196,77 @@ export const GanttView: React.FC<GanttViewProps> = ({ cards, users, onCardClick 
           {/* Today Line */}
           {todayPosition >= 0 && (
             <div
-              className="absolute top-16 bottom-0 w-0.5 bg-red-500 z-10 pointer-events-none"
-              style={{ left: `${todayPosition}%` }}
+              className="absolute bottom-0 w-0.5 bg-red-500 z-10 pointer-events-none shadow-lg"
+              style={{ 
+                left: `calc(256px + ${todayPosition}%)`,
+                top: '0'
+              }}
             >
-              <div className="absolute -top-12 -left-8 text-xs text-red-600 font-medium whitespace-nowrap">
+              <div className="absolute top-2 -left-10 text-xs text-red-600 font-semibold whitespace-nowrap bg-white px-2 py-1 rounded shadow-sm">
                 Today
               </div>
             </div>
           )}
 
           {/* Cards */}
-          <div className="space-y-2">
-            {visibleCards.map((card) => {
+          <div className="divide-y divide-gray-100">
+            {visibleCards.map((card, idx) => {
               const position = getCardPosition(card);
               const user = users.find(u => u.id === card.assigneeId);
               const hasDependencies = card.dependencies && card.dependencies.length > 0;
               
               return (
-                <div key={card.id} className="relative h-12 flex items-center">
-                  <div className="w-48 pr-4 flex-shrink-0">
-                    <div className="text-sm font-medium truncate">{card.title}</div>
-                    <div className="text-xs text-gray-500">
-                      {user?.name || 'Unassigned'}
+                <div 
+                  key={card.id} 
+                  className={`flex items-center hover:bg-gray-50 transition-colors ${
+                    idx % 2 === 0 ? 'bg-white' : 'bg-gray-25'
+                  }`}
+                  style={{ minHeight: '72px' }}
+                >
+                  <div className="w-64 flex-shrink-0 border-r-2 border-gray-300 px-6 py-4">
+                    <div className="text-sm font-semibold text-gray-800 truncate mb-1">
+                      {card.title}
+                    </div>
+                    <div className="text-xs text-gray-500 flex items-center gap-2">
+                      <span>{user?.name || 'Unassigned'}</span>
+                      {card.estimateHours && (
+                        <span className="text-gray-400">• {card.estimateHours}h</span>
+                      )}
                     </div>
                   </div>
-                  <div className="flex-1 relative">
+                  <div className="flex-1 relative px-4 py-4">
+                    {/* Background grid for each day */}
+                    <div className="absolute inset-0 flex">
+                      {days.map((day, dayIdx) => {
+                        const isWeekend = day.getDay() === 0 || day.getDay() === 6;
+                        return (
+                          <div
+                            key={dayIdx}
+                            className={`border-r border-gray-100 ${isWeekend ? 'bg-gray-50' : ''}`}
+                            style={{ 
+                              minWidth: `${dayColumnWidth}px`,
+                              width: `${dayColumnWidth}px`
+                            }}
+                          />
+                        );
+                      })}
+                    </div>
+                    
+                    {/* Card bar */}
                     <button
                       onClick={() => onCardClick?.(card)}
-                      className="absolute h-8 rounded px-3 flex items-center gap-2 text-white text-sm font-medium hover:opacity-90 transition-opacity shadow-sm"
+                      className="absolute h-10 rounded-lg px-4 flex items-center gap-2 text-white font-medium hover:shadow-lg transition-all transform hover:scale-105 z-10"
                       style={{
                         left: position.left,
                         width: position.width,
-                        backgroundColor: getPriorityColor(card.priority)
+                        backgroundColor: getPriorityColor(card.priority),
+                        top: '50%',
+                        transform: 'translateY(-50%)'
                       }}
                     >
-                      <span className="truncate">{card.title}</span>
+                      <span className="truncate text-sm">{card.title}</span>
                       {hasDependencies && (
-                        <span className="text-xs" title="Has dependencies">🔗</span>
+                        <span className="text-xs flex-shrink-0" title="Has dependencies">🔗</span>
                       )}
                     </button>
                   </div>
@@ -219,35 +276,43 @@ export const GanttView: React.FC<GanttViewProps> = ({ cards, users, onCardClick 
           </div>
 
           {visibleCards.length === 0 && (
-            <div className="text-center py-12 text-gray-500">
-              No cards with dates in this time range. Add start or due dates to cards to see them here.
+            <div className="text-center py-20 text-gray-500 bg-gray-50 rounded-lg">
+              <p className="text-lg font-medium mb-2">No tasks in this time range</p>
+              <p className="text-sm">Add start or due dates to cards to see them on the timeline.</p>
             </div>
           )}
         </div>
       </div>
 
-      {/* Legend */}
-      <div className="mt-6 pt-4 border-t border-gray-200">
+      {/* Stats and Legend */}
+      <div className="mt-8 pt-6 border-t border-gray-200 flex items-center justify-between">
+        <div className="flex items-center gap-2 text-sm text-gray-600">
+          <span className="font-semibold">{visibleCards.length}</span>
+          <span>task{visibleCards.length !== 1 ? 's' : ''} in view</span>
+          <span className="mx-2">•</span>
+          <span>{zoomLevel === 'week' ? '2 weeks' : '1 month'} timeline</span>
+        </div>
+        
         <div className="flex items-center gap-6 text-sm">
           <div className="flex items-center gap-2">
-            <div className="w-4 h-4 rounded" style={{ backgroundColor: '#ef4444' }}></div>
-            <span>Urgent</span>
+            <div className="w-5 h-5 rounded shadow-sm" style={{ backgroundColor: '#ef4444' }}></div>
+            <span className="font-medium">Urgent</span>
           </div>
           <div className="flex items-center gap-2">
-            <div className="w-4 h-4 rounded" style={{ backgroundColor: '#f59e0b' }}></div>
-            <span>High</span>
+            <div className="w-5 h-5 rounded shadow-sm" style={{ backgroundColor: '#f59e0b' }}></div>
+            <span className="font-medium">High</span>
           </div>
           <div className="flex items-center gap-2">
-            <div className="w-4 h-4 rounded" style={{ backgroundColor: '#3b82f6' }}></div>
-            <span>Medium</span>
+            <div className="w-5 h-5 rounded shadow-sm" style={{ backgroundColor: '#3b82f6' }}></div>
+            <span className="font-medium">Medium</span>
           </div>
           <div className="flex items-center gap-2">
-            <div className="w-4 h-4 rounded" style={{ backgroundColor: '#10b981' }}></div>
-            <span>Low</span>
+            <div className="w-5 h-5 rounded shadow-sm" style={{ backgroundColor: '#10b981' }}></div>
+            <span className="font-medium">Low</span>
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 ml-4 pl-4 border-l border-gray-300">
             <span>🔗</span>
-            <span>Has dependencies</span>
+            <span className="font-medium">Has dependencies</span>
           </div>
         </div>
       </div>
