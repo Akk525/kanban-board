@@ -42,10 +42,13 @@ export const useFirebaseSync = () => {
   // Create new board in Firebase
   const createBoard = useCallback(async (board: Board, metadata: BoardMetadata) => {
     try {
-      await Promise.all([
-        boardService.createBoard(board.id, board),
-        metadataService.createBoardMetadata(metadata.id, metadata)
-      ]);
+      // boardService.createBoard only takes board data (without id)
+      // It generates and returns the new ID
+      const { id, ...boardData } = board;
+      await boardService.createBoard(boardData);
+      
+      // metadataService uses updateBoardMetadata which handles both create and update
+      await metadataService.updateBoardMetadata(metadata.id, metadata);
     } catch (error) {
       console.error('Error creating board in Firebase:', error);
       throw error;
