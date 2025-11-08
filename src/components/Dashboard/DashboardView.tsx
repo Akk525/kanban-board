@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { 
   TrendingUp, 
   TrendingDown, 
@@ -13,7 +13,7 @@ import {
   ArrowRight
 } from 'lucide-react';
 import type { Board, Card, User, BoardMetadata } from '../../types';
-import { format, isPast } from 'date-fns';
+import { format, isPast, isAfter, subWeeks, subMonths } from 'date-fns';
 
 interface DashboardViewProps {
   boards: Board[];
@@ -38,60 +38,185 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
 }) => {
   const [selectedTimeRange, setSelectedTimeRange] = useState<'week' | 'month' | 'all'>('week');
 
-  // Calculate metrics
-  const totalCards = allCards.length;
-  const completedCards = allCards.filter(card => 
-    card.columnId.toLowerCase().includes('done') || card.completedAt
-  ).length;
-  const inProgressCards = allCards.filter(card => 
-    card.columnId.toLowerCase().includes('progress')
-  ).length;
-  const overdueCards = allCards.filter(card => 
-    card.dueDate && isPast(new Date(card.dueDate)) && !card.completedAt
-  ).length;
-
-  // Team activity
-  const userActivity = users.map(user => {
-    const userCards = allCards.filter(card => card.assigneeId === user.id);
-    const userCompleted = userCards.filter(card => card.completedAt).length;
-    const userInProgress = userCards.filter(card => 
-      card.columnId.toLowerCase().includes('progress')
-    ).length;
-
-    return {
-      user,
-      total: userCards.length,
-      completed: userCompleted,
-      inProgress: userInProgress,
-      completionRate: userCards.length > 0 ? (userCompleted / userCards.length) * 100 : 0
-    };
-  }).filter(activity => activity.total > 0)
-    .sort((a, b) => b.total - a.total)
-    .slice(0, 5);
-
-  // Priority breakdown
-  const priorityBreakdown = {
-    urgent: allCards.filter(c => c.priority === 'urgent').length,
-    high: allCards.filter(c => c.priority === 'high').length,
-    medium: allCards.filter(c => c.priority === 'medium').length,
-    low: allCards.filter(c => c.priority === 'low').length,
+  // Helper: Get date threshold for filtering
+  const getDateThreshold = (): Date | null => {
+    const now = new Date();
+    if (selectedTimeRange === 'week') {
+      return subWeeks(now, 1);
+    } else if (selectedTimeRange === 'month') {
+      return subMonths(now, 1);
+    }
+    return null; // 'all' time
   };
 
-  // Boards overview
-  const boardsOverview = boards.map(board => {
-    const boardCards = board.columns.flatMap(col => col.cards);
-    const metadata = boardsMetadata.find(m => m.id === board.id);
-    
-    return {
-      board,
-      metadata,
-      totalCards: boardCards.length,
-      completed: boardCards.filter(c => c.completedAt).length,
-      overdue: boardCards.filter(c => 
-        c.dueDate && isPast(new Date(c.dueDate)) && !c.completedAt
-      ).length,
+  // Helper: Check if a date is within the selected time range
+  const isWithinTimeRange = (date: Date | undefined): boolean => {
+    if (!date) return false;
+    const threshold = getDateThreshold();
+    if (!threshold) return true; // 'all' time
+    return isAfter(new Date(date), threshold);
+  };
+
+  // Calculate metrics from real card data AND completion history
+  const metrics = useMemo(() => {
+    // Helper function to check if a card is in a "Done" column
+    const isCardCompleted = (card: Card): boolean => {
+      if (card.completedAt) return true;
+      
+      // Check if the card's column has "done" in the title
+      for (const board of boards) {
+        const column = board.columns.find(col => col.id === card.columnId);
+        if (column && column.title.toLowerCase().includes('done')) {
+          return true;
+        }
+      }
+      return false;
     };
-  });
+
+    // Helper function to check if a card is in progress
+    const isCardInProgress = (card: Card): boolean => {
+      for (const board of boards) {
+        const column = board.columns.find(col => col.id === card.columnId);
+        if (column && column.title.toLowerCase().includes('progress')) {
+          return true;
+        }
+      }
+      return false;
+    };
+
+    // Get all completion records from history across all boards
+    const allCompletionHistory = boardsMetadata.flatMap(meta => meta.completionHistory || []);
+
+    // Filter by time range
+    const completionsInRange = allCompletionHistory.filter(record => 
+      isWithinTimeRange(record.completedAt)
+    );
+
+    // Count active (non-archived) cards
+    const activeCards = allCards.filter(card => !card.archived);
+    const totalCards = activeCards.length;
+    
+    // For "completed" count: Use completion history in time range + currently completed cards
+    const currentlyCompletedCards = activeCards.filter(card => isCardCompleted(card));
+    const historicalCompletions = completionsInRange.filter(record => 
+      // Only count if not currently in the active cards (to avoid double counting)
+      !activeCards.some(card => card.id === record.cardId)
+    );
+    const completedCards = currentlyCompletedCards.length + historicalCompletions.length;
+
+    const inProgressCards = activeCards.filter(card => 
+      !isCardCompleted(card) && isCardInProgress(card)
+    ).length;
+    
+    const overdueCards = activeCards.filter(card => 
+      card.dueDate && 
+      isPast(new Date(card.dueDate)) && 
+      !isCardCompleted(card)
+    ).length;
+
+    return { totalCards, completedCards, inProgressCards, overdueCards };
+  }, [allCards, boards, boardsMetadata, selectedTimeRange]);
+
+  const { totalCards, completedCards, inProgressCards, overdueCards } = metrics;
+
+  // Team activity - real completion tracking with useMemo and time filtering
+  const userActivity = useMemo(() => {
+    // Helper function to check if a card is completed
+    const isCardCompleted = (card: Card): boolean => {
+      if (card.completedAt) return true;
+      for (const board of boards) {
+        const column = board.columns.find(col => col.id === card.columnId);
+        if (column && column.title.toLowerCase().includes('done')) {
+          return true;
+        }
+      }
+      return false;
+    };
+
+    // Helper function to check if a card is in progress
+    const isCardInProgress = (card: Card): boolean => {
+      for (const board of boards) {
+        const column = board.columns.find(col => col.id === card.columnId);
+        if (column && column.title.toLowerCase().includes('progress')) {
+          return true;
+        }
+      }
+      return false;
+    };
+
+    // Get all completion records from history
+    const allCompletionHistory = boardsMetadata.flatMap(meta => meta.completionHistory || []);
+
+    return users.map(user => {
+      const userCards = allCards.filter(card => !card.archived && card.assigneeId === user.id);
+      const currentlyCompleted = userCards.filter(card => isCardCompleted(card)).length;
+      
+      // Add historical completions for this user within time range
+      const historicalCompletions = allCompletionHistory.filter(record => 
+        record.assigneeId === user.id &&
+        isWithinTimeRange(record.completedAt) &&
+        // Don't double count if still in active cards
+        !userCards.some(card => card.id === record.cardId)
+      ).length;
+      
+      const userCompleted = currentlyCompleted + historicalCompletions;
+      const userInProgress = userCards.filter(card => 
+        !isCardCompleted(card) && isCardInProgress(card)
+      ).length;
+
+      // Total includes current cards + unique historical completions
+      const uniqueHistorical = allCompletionHistory.filter(record =>
+        record.assigneeId === user.id &&
+        !userCards.some(card => card.id === record.cardId)
+      ).length;
+      const total = userCards.length + uniqueHistorical;
+
+      return {
+        user,
+        total,
+        completed: userCompleted,
+        inProgress: userInProgress,
+        completionRate: total > 0 ? (userCompleted / total) * 100 : 0
+      };
+    }).filter(activity => activity.total > 0)
+      .sort((a, b) => b.completed - a.completed) // Sort by completed count
+      .slice(0, 5);
+  }, [allCards, users, boards, boardsMetadata, selectedTimeRange]);
+
+  // Priority breakdown - exclude archived with useMemo
+  const priorityBreakdown = useMemo(() => ({
+    urgent: allCards.filter(c => !c.archived && c.priority === 'urgent').length,
+    high: allCards.filter(c => !c.archived && c.priority === 'high').length,
+    medium: allCards.filter(c => !c.archived && c.priority === 'medium').length,
+    low: allCards.filter(c => !c.archived && c.priority === 'low').length,
+  }), [allCards]);
+
+  // Boards overview - real completion tracking with useMemo
+  const boardsOverview = useMemo(() => {
+    return boards.map(board => {
+      const boardCards = board.columns.flatMap(col => col.cards).filter(c => !c.archived);
+      const metadata = boardsMetadata.find(m => m.id === board.id);
+      
+      // Find the "Done" column for this board
+      const doneColumns = board.columns.filter(col => col.title.toLowerCase().includes('done'));
+      const doneColumnIds = doneColumns.map(col => col.id);
+      
+      return {
+        board,
+        metadata,
+        totalCards: boardCards.length,
+        completed: boardCards.filter(c => 
+          c.completedAt || doneColumnIds.includes(c.columnId)
+        ).length,
+        overdue: boardCards.filter(c => 
+          c.dueDate && 
+          isPast(new Date(c.dueDate)) && 
+          !c.completedAt &&
+          !doneColumnIds.includes(c.columnId)
+        ).length,
+      };
+    });
+  }, [boards, boardsMetadata]);
 
   const completionRate = totalCards > 0 ? (completedCards / totalCards) * 100 : 0;
 
@@ -344,11 +469,13 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                 <div className="space-y-2">
                   <div className="flex items-center justify-between text-sm">
                     <span className="text-gray-600">Progress</span>
-                    <span className="font-medium text-gray-900">{progress.toFixed(0)}%</span>
+                    <span className="font-medium text-gray-900">
+                      {progress.toFixed(0)}% ({completed}/{totalCards})
+                    </span>
                   </div>
                   <div className="w-full bg-gray-200 rounded-full h-2">
                     <div 
-                      className="bg-blue-600 h-2 rounded-full transition-all"
+                      className="bg-blue-600 h-2 rounded-full transition-all duration-300"
                       style={{ width: `${progress}%` }}
                     />
                   </div>

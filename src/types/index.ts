@@ -1,3 +1,5 @@
+export type Priority = 'low' | 'medium' | 'high' | 'urgent';
+
 export interface User {
   id: string;
   name: string;
@@ -26,7 +28,7 @@ export interface Card {
   title: string;
   description?: string;
   assigneeId?: string;
-  priority: 'low' | 'medium' | 'high' | 'urgent';
+  priority: Priority;
   labels: string[];
   categoryId?: string;
   startDate?: Date;
@@ -50,6 +52,16 @@ export interface Column {
   cards: Card[];
 }
 
+export interface CompletionRecord {
+  cardId: string;
+  cardTitle: string;
+  boardId: string;
+  assigneeId?: string;
+  priority?: Priority;
+  completedAt: Date;
+  estimateHours?: number;
+}
+
 export interface BoardMetadata {
   id: string;
   name: string;
@@ -57,6 +69,7 @@ export interface BoardMetadata {
   color: string;
   createdAt: Date;
   updatedAt: Date;
+  completionHistory?: CompletionRecord[];
 }
 
 export interface Board {
@@ -74,7 +87,7 @@ export interface CreateCardData {
   title: string;
   description?: string;
   assigneeId?: string;
-  priority: Card['priority'];
+  priority: Priority;
   labels: string[];
   categoryId?: string;
   startDate?: Date;

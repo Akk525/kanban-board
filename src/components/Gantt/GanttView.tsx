@@ -9,7 +9,8 @@ import {
   startOfMonth, 
   endOfMonth,
   isSameDay,
-  differenceInDays
+  differenceInDays,
+  startOfDay
 } from 'date-fns';
 import type { Card, User } from '../../types';
 import { ChevronLeft, ChevronRight, ZoomIn, ZoomOut } from 'lucide-react';
@@ -45,16 +46,16 @@ export const GanttView: React.FC<GanttViewProps> = ({ cards, users, onCardClick 
 
   // Filter cards that have dates and are in view range
   const visibleCards = cards.filter(card => {
-    const cardStart = card.startDate ? new Date(card.startDate) : null;
-    const cardDue = card.dueDate ? new Date(card.dueDate) : null;
+    const cardStart = card.startDate ? startOfDay(new Date(card.startDate)) : null;
+    const cardDue = card.dueDate ? startOfDay(new Date(card.dueDate)) : null;
     
     if (!cardStart && !cardDue) return false;
     
     const effectiveStart = cardStart || cardDue!;
     const effectiveEnd = cardDue || cardStart!;
     
-    // Check if card overlaps with view range
-    return effectiveEnd >= start && effectiveStart <= end;
+    // Check if card overlaps with view range (inclusive comparison)
+    return effectiveEnd >= startOfDay(start) && effectiveStart <= startOfDay(end);
   });
 
   const navigate = (direction: 'prev' | 'next') => {
@@ -66,17 +67,29 @@ export const GanttView: React.FC<GanttViewProps> = ({ cards, users, onCardClick 
   };
 
   const getCardPosition = (card: Card) => {
-    const cardStart = card.startDate ? new Date(card.startDate) : new Date(card.dueDate!);
-    const cardDue = card.dueDate ? new Date(card.dueDate) : new Date(card.startDate!);
+    // Normalize dates to start of day to avoid time-based calculation errors
+    const cardStart = card.startDate ? startOfDay(new Date(card.startDate)) : startOfDay(new Date(card.dueDate!));
+    const cardDue = card.dueDate ? startOfDay(new Date(card.dueDate)) : startOfDay(new Date(card.startDate!));
+    const rangeStart = startOfDay(start);
+    const rangeEnd = startOfDay(end);
     
-    const totalDays = days.length;
-    const startDay = Math.max(0, differenceInDays(cardStart, start));
-    const duration = Math.max(1, differenceInDays(cardDue, cardStart) + 1);
+    // Clamp card dates to the visible range
+    const clampedStart = cardStart < rangeStart ? rangeStart : cardStart;
+    const clampedEnd = cardDue > rangeEnd ? rangeEnd : cardDue;
     
-    const left = (startDay / totalDays) * 100;
-    const width = (duration / totalDays) * 100;
+    // Calculate which day index the card starts on (0-based)
+    // Add 1 to offset by one day forward
+    const startDayIndex = Math.max(0, differenceInDays(clampedStart, rangeStart) + 1);
+    // Duration calculation: offset end by -1 to prevent spillover
+    const duration = Math.max(1, differenceInDays(clampedEnd, clampedStart));
     
-    return { left: `${left}%`, width: `${Math.min(width, 100 - left)}%` };
+    // Use pixel positioning aligned to the left edge of the start day column
+    // Small padding for visual separation from column borders
+    const padding = 2;
+    const leftPx = startDayIndex * dayColumnWidth + padding;
+    const widthPx = duration * dayColumnWidth - padding;
+    
+    return { left: `${leftPx}px`, width: `${widthPx}px` };
   };
 
   const getPriorityColor = (priority: string) => {
@@ -89,15 +102,24 @@ export const GanttView: React.FC<GanttViewProps> = ({ cards, users, onCardClick 
     return colors[priority as keyof typeof colors] || colors.medium;
   };
 
-  const today = new Date();
-  const todayInRange = days.some(day => isSameDay(day, today));
-  const todayPosition = todayInRange 
-    ? ((differenceInDays(today, start)) / days.length) * 100 
-    : -1;
-
   // Calculate dynamic column width based on zoom level
   const dayColumnWidth = zoomLevel === 'week' ? 80 : 50; // Wider for week view
   const minTotalWidth = days.length * dayColumnWidth;
+
+  const today = new Date();
+  const todayInRange = days.some(day => isSameDay(day, today));
+  const todayIndex = todayInRange 
+    ? differenceInDays(startOfDay(today), startOfDay(start))
+    : -1;
+  
+  // Calculate position based on current time of day (0 = start of day, 1 = end of day)
+  const timeProgress = todayInRange 
+    ? (today.getHours() * 60 + today.getMinutes()) / (24 * 60) // 0.0 to 1.0
+    : 0;
+  
+  const todayPositionPx = todayIndex >= 0 
+    ? todayIndex * dayColumnWidth + timeProgress * dayColumnWidth
+    : -1;
 
   return (
     <div className="bg-white rounded-lg shadow-lg p-8">
@@ -194,11 +216,11 @@ export const GanttView: React.FC<GanttViewProps> = ({ cards, users, onCardClick 
           </div>
 
           {/* Today Line */}
-          {todayPosition >= 0 && (
+          {todayPositionPx >= 0 && (
             <div
               className="absolute bottom-0 w-0.5 bg-red-500 z-10 pointer-events-none shadow-lg"
               style={{ 
-                left: `calc(256px + ${todayPosition}%)`,
+                left: `calc(256px + 2px + ${todayPositionPx}px)`,
                 top: '0'
               }}
             >
@@ -234,7 +256,7 @@ export const GanttView: React.FC<GanttViewProps> = ({ cards, users, onCardClick 
                       )}
                     </div>
                   </div>
-                  <div className="flex-1 relative px-4 py-4">
+                  <div className="flex-1 relative py-4">
                     {/* Background grid for each day */}
                     <div className="absolute inset-0 flex">
                       {days.map((day, dayIdx) => {

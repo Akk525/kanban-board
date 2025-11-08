@@ -137,4 +137,57 @@
     25% { transform: translateX(-5px); }
     75% { transform: translateX(5px); }
   }
+  
+  /* View transition animations */
+  .view-transition-enter {
+    animation: viewSlideIn 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+  }
+  
+  @keyframes viewSlideIn {
+    from {
+      opacity: 0;
+      transform: translateY(20px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+  
+  .view-transition-fade {
+    animation: viewFadeIn 0.3s ease-out;
+  }
+  
+  @keyframes viewFadeIn {
+    from {
+      opacity: 0;
+    }
+    to {
+      opacity: 1;
+    }
+  }
+  
+  /* Loading animations */
+  .animate-fadeIn {
+    animation: fadeIn 0.5s ease-out;
+  }
+  
+  .animate-slideIn {
+    animation: slideUp 0.5s cubic-bezier(0.4, 0, 0.2, 1);
+  }
+  
+  /* Pulse glow effect */
+  @keyframes pulseGlow {
+    0%, 100% {
+      opacity: 1;
+    }
+    50% {
+      opacity: 0.5;
+    }
+  }
+  
+  .animate-pulseGlow {
+    animation: pulseGlow 2s ease-in-out infinite;
+  }
 }
+

@@ -10,11 +10,11 @@ interface ViewTabsProps {
 }
 
 const views: Array<{ id: ViewType; label: string; icon: React.ReactNode }> = [
+  { id: 'dashboard', label: 'Dashboard', icon: <BarChart3 className="w-4 h-4" /> },
   { id: 'kanban', label: 'Kanban', icon: <LayoutGrid className="w-4 h-4" /> },
   { id: 'table', label: 'Table', icon: <Table className="w-4 h-4" /> },
   { id: 'calendar', label: 'Calendar', icon: <Calendar className="w-4 h-4" /> },
   { id: 'gantt', label: 'Gantt', icon: <GanttChart className="w-4 h-4" /> },
-  { id: 'dashboard', label: 'Dashboard', icon: <BarChart3 className="w-4 h-4" /> },
 ];
 
 export const ViewTabs: React.FC<ViewTabsProps> = ({ activeView, onViewChange }) => {

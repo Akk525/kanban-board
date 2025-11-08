@@ -1,7 +1,8 @@
-import React, { createContext, useContext, useReducer, useEffect } from 'react';
+import React, { createContext, useContext, useReducer, useEffect, useCallback } from 'react';
 import type { ReactNode } from 'react';
 import { v4 as uuidv4 } from 'uuid';
-import type { Board, BoardMetadata, Card, Column, User, CreateCardData, UpdateCardData } from '../types';
+import type { Board, BoardMetadata, Card, Column, User, CreateCardData, UpdateCardData, CompletionRecord } from '../types';
+import { boardService, metadataService } from '../services/firebaseService';
 
 interface BoardState {
   boards: Board[];
@@ -74,12 +75,6 @@ function boardReducer(state: BoardState, action: BoardAction): BoardState {
       };
 
     case 'SET_ACTIVE_BOARD': {
-      // Save boards to localStorage before switching
-      if (typeof window !== 'undefined') {
-        localStorage.setItem('kanban_boards', JSON.stringify(state.boards));
-        localStorage.setItem('kanban_board_metadata', JSON.stringify(state.boardMetadata));
-        localStorage.setItem('kanban_active_board', action.payload);
-      }
       return { ...state, activeBoardId: action.payload };
     }
 
@@ -114,12 +109,6 @@ function boardReducer(state: BoardState, action: BoardAction): BoardState {
       const updatedBoards = [...state.boards, newBoard];
       const updatedMetadata = [...state.boardMetadata, newMetadata];
 
-      // Save to localStorage
-      if (typeof window !== 'undefined') {
-        localStorage.setItem('kanban_boards', JSON.stringify(updatedBoards));
-        localStorage.setItem('kanban_board_metadata', JSON.stringify(updatedMetadata));
-      }
-
       return {
         ...state,
         boards: updatedBoards,
@@ -152,12 +141,6 @@ function boardReducer(state: BoardState, action: BoardAction): BoardState {
           : board
       );
 
-      // Save to localStorage
-      if (typeof window !== 'undefined') {
-        localStorage.setItem('kanban_boards', JSON.stringify(updatedBoards));
-        localStorage.setItem('kanban_board_metadata', JSON.stringify(updatedMetadata));
-      }
-
       return {
         ...state,
         boards: updatedBoards,
@@ -172,15 +155,6 @@ function boardReducer(state: BoardState, action: BoardAction): BoardState {
       let newActiveBoardId = state.activeBoardId;
       if (state.activeBoardId === action.payload) {
         newActiveBoardId = updatedMetadata[0]?.id || null;
-      }
-
-      // Save to localStorage
-      if (typeof window !== 'undefined') {
-        localStorage.setItem('kanban_boards', JSON.stringify(updatedBoards));
-        localStorage.setItem('kanban_board_metadata', JSON.stringify(updatedMetadata));
-        if (newActiveBoardId) {
-          localStorage.setItem('kanban_active_board', newActiveBoardId);
-        }
       }
 
       return {
@@ -225,12 +199,6 @@ function boardReducer(state: BoardState, action: BoardAction): BoardState {
           : meta
       );
 
-      // Save to localStorage
-      if (typeof window !== 'undefined') {
-        localStorage.setItem('kanban_boards', JSON.stringify(updatedBoards));
-        localStorage.setItem('kanban_board_metadata', JSON.stringify(updatedMetadata));
-      }
-
       return { ...state, boards: updatedBoards, boardMetadata: updatedMetadata };
     }
 
@@ -262,12 +230,6 @@ function boardReducer(state: BoardState, action: BoardAction): BoardState {
           : meta
       );
 
-      // Save to localStorage
-      if (typeof window !== 'undefined') {
-        localStorage.setItem('kanban_boards', JSON.stringify(updatedBoards));
-        localStorage.setItem('kanban_board_metadata', JSON.stringify(updatedMetadata));
-      }
-
       return { ...state, boards: updatedBoards, boardMetadata: updatedMetadata };
     }
 
@@ -294,12 +256,6 @@ function boardReducer(state: BoardState, action: BoardAction): BoardState {
           ? { ...meta, updatedAt: new Date() }
           : meta
       );
-
-      // Save to localStorage
-      if (typeof window !== 'undefined') {
-        localStorage.setItem('kanban_boards', JSON.stringify(updatedBoards));
-        localStorage.setItem('kanban_board_metadata', JSON.stringify(updatedMetadata));
-      }
 
       return { ...state, boards: updatedBoards, boardMetadata: updatedMetadata };
     }
@@ -332,12 +288,6 @@ function boardReducer(state: BoardState, action: BoardAction): BoardState {
           : meta
       );
 
-      // Save to localStorage
-      if (typeof window !== 'undefined') {
-        localStorage.setItem('kanban_boards', JSON.stringify(updatedBoards));
-        localStorage.setItem('kanban_board_metadata', JSON.stringify(updatedMetadata));
-      }
-
       return { ...state, boards: updatedBoards, boardMetadata: updatedMetadata };
     }
 
@@ -369,12 +319,6 @@ function boardReducer(state: BoardState, action: BoardAction): BoardState {
           : meta
       );
 
-      // Save to localStorage
-      if (typeof window !== 'undefined') {
-        localStorage.setItem('kanban_boards', JSON.stringify(updatedBoards));
-        localStorage.setItem('kanban_board_metadata', JSON.stringify(updatedMetadata));
-      }
-
       return { ...state, boards: updatedBoards, boardMetadata: updatedMetadata };
     }
 
@@ -384,19 +328,26 @@ function boardReducer(state: BoardState, action: BoardAction): BoardState {
 
       const { cardId, sourceColumnId, targetColumnId, newOrder } = action.payload;
       
+      // Find the target column to check if it's a "Done" column
+      const targetColumn = activeBoard.columns.find(col => col.id === targetColumnId);
+      const sourceColumn = activeBoard.columns.find(col => col.id === sourceColumnId);
+      const isDoneColumn = targetColumn?.title.toLowerCase().includes('done') || false;
+      const wasInDoneColumn = sourceColumn?.title.toLowerCase().includes('done') || false;
+      
       // Find the card to move
       let cardToMove: Card | null = null;
       const updatedColumns = activeBoard.columns.map(column => {
         if (column.id === sourceColumnId) {
           const card = column.cards.find(c => c.id === cardId);
           if (card) {
+            const now = new Date();
             cardToMove = { 
               ...card, 
               columnId: targetColumnId, 
               order: newOrder, 
-              updatedAt: new Date(),
-              // Mark as completed if moved to Done column
-              completedAt: targetColumnId.toLowerCase().includes('done') ? new Date() : card.completedAt
+              updatedAt: now,
+              // Mark as completed if moved to Done column, clear if moved out
+              completedAt: isDoneColumn ? (card.completedAt || now) : undefined
             };
             return { ...column, cards: column.cards.filter(c => c.id !== cardId) };
           }
@@ -405,6 +356,44 @@ function boardReducer(state: BoardState, action: BoardAction): BoardState {
       });
 
       if (!cardToMove) return state;
+
+      // Track completion in history when card is moved TO Done column (and wasn't already there)
+      let metadataWithHistory: BoardMetadata[] = state.boardMetadata;
+      const movedCard: Card = cardToMove; // Type narrowing after null check
+      
+      if (isDoneColumn && !wasInDoneColumn && movedCard.completedAt) {
+        const completedAt: Date = movedCard.completedAt;
+        
+        metadataWithHistory = state.boardMetadata.map(meta => {
+          if (meta.id === state.activeBoardId) {
+            const completionHistory: CompletionRecord[] = meta.completionHistory || [];
+            // Check if this completion is already recorded
+            const alreadyRecorded = completionHistory.some(record => 
+              record.cardId === movedCard.id && 
+              record.completedAt.getTime() === completedAt.getTime()
+            );
+            
+            if (!alreadyRecorded) {
+              const newRecord: CompletionRecord = {
+                cardId: movedCard.id,
+                cardTitle: movedCard.title,
+                boardId: state.activeBoardId!,
+                assigneeId: movedCard.assigneeId,
+                priority: movedCard.priority,
+                completedAt: completedAt,
+                estimateHours: movedCard.estimateHours,
+              };
+              
+              return {
+                ...meta,
+                completionHistory: [...completionHistory, newRecord],
+                updatedAt: new Date(),
+              };
+            }
+          }
+          return meta;
+        });
+      }
 
       // Add card to target column
       const finalColumns = updatedColumns.map(column => {
@@ -427,20 +416,14 @@ function boardReducer(state: BoardState, action: BoardAction): BoardState {
         board.id === state.activeBoardId ? updatedBoard : board
       );
 
-      // Update metadata timestamp
-      const updatedMetadata = state.boardMetadata.map(meta =>
+      // Merge history with timestamp update
+      const finalMetadata = metadataWithHistory.map(meta =>
         meta.id === state.activeBoardId
           ? { ...meta, updatedAt: new Date() }
           : meta
       );
 
-      // Save to localStorage
-      if (typeof window !== 'undefined') {
-        localStorage.setItem('kanban_boards', JSON.stringify(updatedBoards));
-        localStorage.setItem('kanban_board_metadata', JSON.stringify(updatedMetadata));
-      }
-
-      return { ...state, boards: updatedBoards, boardMetadata: updatedMetadata };
+      return { ...state, boards: updatedBoards, boardMetadata: finalMetadata };
     }
 
     case 'ADD_COLUMN': {
@@ -471,12 +454,6 @@ function boardReducer(state: BoardState, action: BoardAction): BoardState {
           : meta
       );
 
-      // Save to localStorage
-      if (typeof window !== 'undefined') {
-        localStorage.setItem('kanban_boards', JSON.stringify(updatedBoards));
-        localStorage.setItem('kanban_board_metadata', JSON.stringify(updatedMetadata));
-      }
-
       return { ...state, boards: updatedBoards, boardMetadata: updatedMetadata };
     }
 
@@ -505,12 +482,6 @@ function boardReducer(state: BoardState, action: BoardAction): BoardState {
           : meta
       );
 
-      // Save to localStorage
-      if (typeof window !== 'undefined') {
-        localStorage.setItem('kanban_boards', JSON.stringify(updatedBoards));
-        localStorage.setItem('kanban_board_metadata', JSON.stringify(updatedMetadata));
-      }
-
       return { ...state, boards: updatedBoards, boardMetadata: updatedMetadata };
     }
 
@@ -534,12 +505,6 @@ function boardReducer(state: BoardState, action: BoardAction): BoardState {
           ? { ...meta, updatedAt: new Date() }
           : meta
       );
-
-      // Save to localStorage
-      if (typeof window !== 'undefined') {
-        localStorage.setItem('kanban_boards', JSON.stringify(updatedBoards));
-        localStorage.setItem('kanban_board_metadata', JSON.stringify(updatedMetadata));
-      }
 
       return { ...state, boards: updatedBoards, boardMetadata: updatedMetadata };
     }
@@ -670,59 +635,139 @@ export const BoardProvider: React.FC<{ children: ReactNode }> = ({ children }) =
     }));
   };
 
-  // Load boards from localStorage on mount
-  useEffect(() => {
-    if (typeof window !== 'undefined') {
-      const savedBoards = localStorage.getItem('kanban_boards');
-      const savedMetadata = localStorage.getItem('kanban_board_metadata');
-      const savedActiveBoardId = localStorage.getItem('kanban_active_board');
+  // Helper to sync to Firebase (non-blocking)
+  const syncToFirebase = useCallback(async (boards: Board[], metadata: BoardMetadata[]) => {
+    if (boards.length === 0) return;
 
-      if (savedBoards && savedMetadata) {
-        try {
-          const boards = JSON.parse(savedBoards);
-          const metadata = JSON.parse(savedMetadata);
-          
-          // Convert date strings back to Date objects
-          const deserializedBoards = deserializeDates(boards);
-          
-          // Convert metadata dates
-          const deserializedMetadata = metadata.map((meta: any) => ({
-            ...meta,
-            createdAt: new Date(meta.createdAt),
-            updatedAt: new Date(meta.updatedAt),
-          }));
-          
-          // Only load if we have valid data
-          if (deserializedBoards.length > 0 && deserializedMetadata.length > 0) {
-            dispatch({
-              type: 'SET_BOARDS',
-              payload: { boards: deserializedBoards, metadata: deserializedMetadata },
-            });
-
-            if (savedActiveBoardId && deserializedBoards.find((b: any) => b.id === savedActiveBoardId)) {
-              dispatch({
-                type: 'SET_ACTIVE_BOARD',
-                payload: savedActiveBoardId,
-              });
-            }
-          }
-        } catch (error) {
-          console.error('Failed to load boards from localStorage:', error);
-        }
+    try {
+      // Save to localStorage as cache (for offline support)
+      if (typeof window !== 'undefined') {
+        localStorage.setItem('kanban_boards', JSON.stringify(boards));
+        localStorage.setItem('kanban_board_metadata', JSON.stringify(metadata));
       }
+
+      // Sync each board to Firebase asynchronously
+      await Promise.all([
+        ...boards.map(board => 
+          boardService.updateBoard(board.id, board).catch(err => {
+            console.error(`Failed to sync board ${board.id} to Firebase:`, err);
+            return null; // Continue with other syncs even if one fails
+          })
+        ),
+        ...metadata.map(meta => 
+          metadataService.updateBoardMetadata(meta.id, meta).catch(err => {
+            console.error(`Failed to sync metadata ${meta.id} to Firebase:`, err);
+            return null;
+          })
+        )
+      ]);
+
+      console.log('✅ Synced to Firebase successfully');
+    } catch (err) {
+      console.error('❌ Firebase sync failed, data cached locally:', err);
     }
   }, []);
 
-  // Save boards to localStorage whenever they change
+  // Load boards from Firebase on mount, fallback to localStorage
   useEffect(() => {
-    if (state.boards.length > 0 && typeof window !== 'undefined') {
-      localStorage.setItem('kanban_boards', JSON.stringify(state.boards));
-      localStorage.setItem('kanban_board_metadata', JSON.stringify(state.boardMetadata));
-      if (state.activeBoardId) {
-        localStorage.setItem('kanban_active_board', state.activeBoardId);
+    const loadData = async () => {
+      try {
+        // Try to load from Firebase first
+        const [boards, metadata] = await Promise.all([
+          boardService.getAllBoards(),
+          metadataService.getAllBoardsMetadata()
+        ]);
+
+        if (boards.length > 0 && metadata.length > 0) {
+          dispatch({
+            type: 'SET_BOARDS',
+            payload: { boards, metadata },
+          });
+
+          // Save to localStorage as cache
+          localStorage.setItem('kanban_boards', JSON.stringify(boards));
+          localStorage.setItem('kanban_board_metadata', JSON.stringify(metadata));
+
+          const savedActiveBoardId = localStorage.getItem('kanban_active_board');
+          if (savedActiveBoardId && boards.find(b => b.id === savedActiveBoardId)) {
+            dispatch({
+              type: 'SET_ACTIVE_BOARD',
+              payload: savedActiveBoardId,
+            });
+          }
+          return;
+        }
+      } catch (error) {
+        console.error('Failed to load from Firebase, falling back to localStorage:', error);
       }
+
+      // Fallback to localStorage
+      if (typeof window !== 'undefined') {
+        const savedBoards = localStorage.getItem('kanban_boards');
+        const savedMetadata = localStorage.getItem('kanban_board_metadata');
+        const savedActiveBoardId = localStorage.getItem('kanban_active_board');
+
+        if (savedBoards && savedMetadata) {
+          try {
+            const boards = JSON.parse(savedBoards);
+            const metadata = JSON.parse(savedMetadata);
+            
+            // Convert date strings back to Date objects
+            const deserializedBoards = deserializeDates(boards);
+            
+            // Convert metadata dates
+            const deserializedMetadata = metadata.map((meta: any) => ({
+              ...meta,
+              createdAt: new Date(meta.createdAt),
+              updatedAt: new Date(meta.updatedAt),
+              completionHistory: meta.completionHistory?.map((record: any) => ({
+                ...record,
+                completedAt: new Date(record.completedAt),
+              })) || [],
+            }));
+            
+            // Only load if we have valid data
+            if (deserializedBoards.length > 0 && deserializedMetadata.length > 0) {
+              dispatch({
+                type: 'SET_BOARDS',
+                payload: { boards: deserializedBoards, metadata: deserializedMetadata },
+              });
+
+              if (savedActiveBoardId && deserializedBoards.find((b: any) => b.id === savedActiveBoardId)) {
+                dispatch({
+                  type: 'SET_ACTIVE_BOARD',
+                  payload: savedActiveBoardId,
+                });
+              }
+            }
+          } catch (error) {
+            console.error('Failed to load boards from localStorage:', error);
+          }
+        }
+      }
+    };
+
+    loadData();
+  }, []);
+
+  // Sync to Firebase whenever boards or metadata change (debounced)
+  useEffect(() => {
+    if (state.boards.length === 0) return;
+
+    // Debounce Firebase sync to avoid too many writes
+    const syncTimeout = setTimeout(() => {
+      syncToFirebase(state.boards, state.boardMetadata);
+    }, 1000); // Wait 1 second after last change before syncing
+
+    return () => clearTimeout(syncTimeout);
+  }, [state.boards, state.boardMetadata, syncToFirebase]);
+
+  // Separate effect for active board ID (doesn't need Firebase sync)
+  useEffect(() => {
+    if (state.activeBoardId && typeof window !== 'undefined') {
+      localStorage.setItem('kanban_active_board', state.activeBoardId);
     }
-  }, [state.boards, state.boardMetadata, state.activeBoardId]);
+  }, [state.activeBoardId]);
 
   return (
     <BoardContext.Provider value={{ state, dispatch }}>

@@ -21,11 +21,14 @@ A modern Kanban board application similar to Jira, built with React, TypeScript,
 - **🎯 Dashboard View**: Metrics, analytics, and board overview
 
 ### Dashboard Features
-- **Key Metrics**: Total tasks, completion rate, in-progress, and overdue counts
-- **Priority Distribution**: Visual breakdown of tasks by priority level
-- **Top Contributors**: Team member activity and completion rates
-- **Board Overview**: Quick access to all boards with progress indicators
+- **Real-Time Metrics**: Total tasks, completion rate, in-progress, and overdue counts (auto-updates when tasks are completed)
+- **Live Completion Tracking**: Automatically updates when cards are moved to "Done" or marked complete
+- **Priority Distribution**: Visual breakdown of tasks by priority level with percentages
+- **Top Contributors**: Team member activity and completion rates based on actual task completion
+- **Board Overview**: Quick access to all boards with real-time progress indicators
 - **Time Filtering**: View metrics by week, month, or all time
+- **Smart Stats**: Excludes archived tasks for accurate current metrics
+- **Default View**: Dashboard is the first thing you see when loading the app
 
 ### Table View Features
 - **Spreadsheet Layout**: See all tasks in a comprehensive table format
@@ -118,15 +121,24 @@ src/
 
 ## 🎯 Usage
 
+### Getting Started
+When you first load the app, you'll see the **Dashboard** with an overview of all your projects, metrics, and team activity. From there, you can:
+- Click any board to switch to it and view in Kanban mode
+- Use the view tabs to switch between Dashboard, Kanban, Table, Calendar, and Gantt views
+- Create new boards from the board selector dropdown
+
 ### Switching Views
 Navigate between different views using the view tabs at the top:
-- **Kanban**: Classic drag-and-drop board
+- **Dashboard**: Metrics, stats, and project overview (default view)
+- **Kanban**: Classic drag-and-drop board with columns
+- **Table**: Spreadsheet view with sorting and filtering
+- **Calendar**: Monthly calendar with task deadlines
 - **Gantt**: Timeline view for project planning
-- **Dashboard**: Metrics and board overview
 
 ### Creating Cards
-1. Click the "+" button in any column header (Kanban view)
-2. Fill in the card details:
+1. Switch to **Kanban** view
+2. Click the "+" button in any column header
+3. Fill in the card details:
    - **Title** (required)
    - **Description**
    - **Assignee** - Select from team members
@@ -134,8 +146,17 @@ Navigate between different views using the view tabs at the top:
    - **Start Date** - When work begins
    - **Due Date** - Deadline
    - **Estimate** - Hours needed (optional)
-3. Add labels as needed
-4. Click "Create Card"
+4. Add labels as needed
+5. Click "Create Card"
+
+### Dashboard Overview
+The dashboard provides a comprehensive view of your workspace:
+- **Key Metrics**: Total tasks, completed tasks with percentage, in-progress count, overdue alerts
+- **Real-Time Updates**: Stats automatically update when you complete tasks (move to "Done" column)
+- **Priority Breakdown**: See distribution of urgent, high, medium, and low priority tasks
+- **Team Performance**: View top contributors with their task counts and completion rates
+- **Board Cards**: Click any board card to switch to that board in Kanban view
+- **Time Filters**: Toggle between This Week, This Month, or All Time views
 
 ### Using the Gantt Chart
 1. Switch to **Gantt** view

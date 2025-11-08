@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useMemo } from 'react';
 import {
   DndContext,
   DragOverlay,
@@ -15,13 +15,16 @@ import { Card } from './Card';
 import { CreateCardModal } from './CreateCardModal';
 import { CardDetailsModal } from './CardDetailsModal';
 import { FilterPanel, useCardFilters } from './FilterPanel';
-import { GameStats } from './GameStats';
+import { Navbar } from './Navbar';
+import { Greeting } from './Greeting';
+import { LoadingSpinner } from './LoadingSpinner';
 import { Celebration } from './Celebration';
 import { CategoryManager } from './CategoryManager';
 import { Archive } from './Archive';
 import { BoardSelector } from './BoardSelector';
 import { BoardManager } from './BoardManager';
 import { InputModal } from './InputModal';
+import { UserSettings } from './UserSettings';
 import { ViewTabs, type ViewType } from './ViewTabs';
 import { GanttView } from './Gantt/GanttView';
 import { DashboardView } from './Dashboard/DashboardView';
@@ -50,7 +53,9 @@ export const Board: React.FC = () => {
   const [showBoardManager, setShowBoardManager] = useState(false);
   const [showCreateBoardModal, setShowCreateBoardModal] = useState(false);
   const [showAddColumnModal, setShowAddColumnModal] = useState(false);
-  const [activeView, setActiveView] = useState<ViewType>('kanban');
+  const [showUserSettings, setShowUserSettings] = useState(false);
+  const [activeView, setActiveView] = useState<ViewType>('dashboard'); // Default to dashboard
+  const [isLoadingView, setIsLoadingView] = useState(false);
   const { filters, setFilters, applyFilters } = useCardFilters();
 
   const sensors = useSensors(
@@ -217,25 +222,42 @@ export const Board: React.FC = () => {
     .flatMap(col => col.cards)
     .filter(card => card.archived) || [];
 
+  // Memoize allCards for Dashboard to ensure proper updates
+  const allCards = useMemo(() => {
+    return state.boards.flatMap(b => b.columns.flatMap(col => col.cards));
+  }, [state.boards]);
+
   // Show loading only if we're still initializing
   if (!filteredBoard || !activeBoardMetadata) {
     // If boards exist but no active board, something is wrong
     if (state.boards.length > 0 && !state.activeBoardId) {
       // Set the first board as active
       dispatch({ type: 'SET_ACTIVE_BOARD', payload: state.boards[0].id });
-      return <div className="flex items-center justify-center h-screen">Loading...</div>;
+      return (
+        <div className="flex items-center justify-center h-screen bg-gradient-to-br from-blue-50 via-white to-indigo-50">
+          <LoadingSpinner size="lg" fullScreen message="Loading your workspace..." />
+        </div>
+      );
     }
-    return <div className="flex items-center justify-center h-screen">Loading...</div>;
+    return (
+      <div className="flex items-center justify-center h-screen bg-gradient-to-br from-blue-50 via-white to-indigo-50">
+        <LoadingSpinner size="lg" fullScreen message="Setting up your board..." />
+      </div>
+    );
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 flex flex-col">
-      {/* Compact Game Stats */}
-      <div className="bg-white shadow-sm border-b border-gray-200 py-2">
-        <div className="max-w-7xl mx-auto px-4">
-          <GameStats />
-        </div>
-      </div>
+    <div className="min-h-screen bg-gray-50 flex flex-col animate-fadeIn">
+      {/* New Navbar with Tuesday branding and dropdown menu */}
+      <Navbar 
+        userName="Player One"
+        userEmail="player@tuesday.com"
+        onSettings={() => setShowUserSettings(true)}
+        onLogout={() => console.log('Logout clicked')}
+      />
+
+      {/* Fun Greeting Message */}
+      <Greeting userName="Player One" />
 
       {/* Compact Header */}
       <div className="bg-white shadow-sm border-b border-gray-200 py-3">
@@ -261,24 +283,29 @@ export const Board: React.FC = () => {
             </div>
             
             <div className="flex items-center gap-2">
-              <div className="relative">
-                <Search className="absolute left-2 top-1/2 transform -translate-y-1/2 text-gray-400" size={14} />
-                <input
-                  type="text"
-                  placeholder="Search..."
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                  className="pl-8 pr-3 py-1.5 text-sm border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500 w-48"
-                />
-              </div>
-              
-              <button 
-                className="btn-secondary flex items-center gap-1 text-xs px-3 py-1.5"
-                onClick={() => setShowFilters(true)}
-              >
-                <Filter size={14} />
-                Filter
-              </button>
+              {/* Show search and filter only for kanban and table views */}
+              {(activeView === 'kanban' || activeView === 'table') && (
+                <>
+                  <div className="relative">
+                    <Search className="absolute left-2 top-1/2 transform -translate-y-1/2 text-gray-400" size={14} />
+                    <input
+                      type="text"
+                      placeholder="Search..."
+                      value={searchTerm}
+                      onChange={(e) => setSearchTerm(e.target.value)}
+                      className="pl-8 pr-3 py-1.5 text-sm border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500 w-48"
+                    />
+                  </div>
+                  
+                  <button 
+                    className="btn-secondary flex items-center gap-1 text-xs px-3 py-1.5"
+                    onClick={() => setShowFilters(true)}
+                  >
+                    <Filter size={14} />
+                    Filter
+                  </button>
+                </>
+              )}
 
               <button 
                 className="btn-secondary flex items-center gap-1 text-xs px-3 py-1.5 relative"
@@ -301,13 +328,16 @@ export const Board: React.FC = () => {
                 Categories
               </button>
               
-              <button
-                onClick={handleAddColumn}
-                className="btn-primary flex items-center gap-1 text-xs px-3 py-1.5"
-              >
-                <Plus size={14} />
-                Add Column
-              </button>
+              {/* Show Add Column only for kanban view */}
+              {activeView === 'kanban' && (
+                <button
+                  onClick={handleAddColumn}
+                  className="btn-primary flex items-center gap-1 text-xs px-3 py-1.5"
+                >
+                  <Plus size={14} />
+                  Add Column
+                </button>
+              )}
             </div>
           </div>
         </div>
@@ -316,18 +346,33 @@ export const Board: React.FC = () => {
       {/* View Tabs */}
       <div className="bg-white border-b border-gray-200 py-3">
         <div className="max-w-7xl mx-auto px-4">
-          <ViewTabs activeView={activeView} onViewChange={setActiveView} />
+          <ViewTabs 
+            activeView={activeView} 
+            onViewChange={(view) => {
+              setIsLoadingView(true);
+              // Small delay for smooth transition
+              setTimeout(() => {
+                setActiveView(view);
+                setIsLoadingView(false);
+              }, 150);
+            }} 
+          />
         </div>
       </div>
 
-      {/* Board */}
+      {/* Board with view transition animations */}
       <div className={clsx(
-        "flex-1",
+        "flex-1 view-transition-enter",
         activeView === 'table' || activeView === 'calendar' ? "flex flex-col" : "p-4"
       )}>
-        <div className={clsx(
-          activeView === 'table' || activeView === 'calendar' ? "h-full" : "max-w-7xl mx-auto"
-        )}>
+        {isLoadingView ? (
+          <div className="flex items-center justify-center h-full min-h-[400px]">
+            <LoadingSpinner size="lg" message="Loading view..." />
+          </div>
+        ) : (
+          <div className={clsx(
+            activeView === 'table' || activeView === 'calendar' ? "h-full" : "max-w-7xl mx-auto"
+          )}>
           {activeView === 'kanban' ? (
             <DndContext
               sensors={sensors}
@@ -391,7 +436,7 @@ export const Board: React.FC = () => {
             <DashboardView
               boards={state.boards}
               boardsMetadata={state.boardMetadata}
-              allCards={state.boards.flatMap(b => b.columns.flatMap(col => col.cards))}
+              allCards={allCards}
               users={state.users}
               activeBoardId={state.activeBoardId}
               onBoardSelect={(boardId) => dispatch({ type: 'SET_ACTIVE_BOARD', payload: boardId })}
@@ -399,7 +444,8 @@ export const Board: React.FC = () => {
               onSwitchToKanban={() => setActiveView('kanban')}
             />
           )}
-        </div>
+          </div>
+        )}
       </div>
 
       {/* Create Card Modal */}
@@ -547,6 +593,14 @@ export const Board: React.FC = () => {
         label="Column Title"
         placeholder="e.g., To Do, In Progress, Done..."
         confirmText="Add Column"
+      />
+
+      {/* User Settings Modal */}
+      <UserSettings
+        isOpen={showUserSettings}
+        onClose={() => setShowUserSettings(false)}
+        userName="Player One"
+        userEmail="player@tuesday.com"
       />
     </div>
   );
